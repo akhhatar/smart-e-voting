@@ -1,0 +1,22 @@
+{
+    "name": "ECI Smart E-Voting",
+    "short_name": "E-Voting",
+    "description": "Secure Electronic Voting Portal by Election Commission of India",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#000080",
+    "icons": [{
+            "src": "/eci-logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/eci-logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
