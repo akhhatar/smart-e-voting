@@ -6,7 +6,7 @@ import {
   ShieldCheck, RefreshCw, Clock, Info, Settings, LogOut, Download, 
   Users, Trash2, ShieldAlert, Activity, Mail, UserPlus, ListFilter,
   MessageSquare, FileText, BarChart3, Fingerprint, Lock, Shield, X, Maximize2,
-  ChevronLeft, ChevronRight, Phone, AlertCircle, CheckSquare, Ticket
+  ChevronLeft, ChevronRight, Phone, AlertCircle, CheckSquare, Ticket, Image as ImageIcon
 } from 'lucide-react';
 
 // === FIREBASE IMPORTS ===
@@ -159,7 +159,6 @@ const EciLogoHeader = () => (
   </div>
 );
 
-// FIX: Made signature line visible on mobile too
 const EciLogoSmall = () => (
   <div className="flex items-center gap-2 bg-white px-2 py-1.5 md:px-3 md:py-1.5 rounded-md border-b-2 border-[#c0267a] shadow-sm">
     <img src="/eci-logo.png" alt="ECI Logo" className="w-7 h-7 md:w-8 md:h-8 object-contain" onError={(e) => {e.target.src='https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Election_Commission_of_India_Logo.svg/1024px-Election_Commission_of_India_Logo.svg.png'}}/>
@@ -1228,16 +1227,26 @@ const UserDashboard = () => {
                     {config?.electionStatus === 'active' && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                             {candidates.map(c => (
-                                <div key={c.id} className="bg-white rounded-3xl shadow-md hover:shadow-2xl transition-all overflow-hidden border border-slate-200 group flex flex-col transform hover:-translate-y-2">
-                                    <div className="h-56 bg-gradient-to-b from-slate-100 to-slate-200 relative p-6 flex items-center justify-center border-b border-slate-200">
-                                        <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white shadow-xl z-10 bg-slate-300">
+                                <div key={c.id} className="bg-white rounded-3xl shadow-md hover:shadow-2xl transition-all overflow-hidden border border-slate-200 group flex flex-col transform hover:-translate-y-2 relative">
+                                    <div className="h-56 relative p-6 flex items-center justify-center border-b border-slate-200 overflow-hidden bg-slate-100">
+                                        {/* NAYA: Background Image Display */}
+                                        {c.backgroundUrl ? (
+                                          <div className="absolute inset-0 z-0">
+                                            <img src={c.backgroundUrl} className="w-full h-full object-cover opacity-20" alt="background"/>
+                                            <div className="absolute inset-0 bg-gradient-to-t from-slate-100 via-transparent to-transparent"></div>
+                                          </div>
+                                        ) : (
+                                          <div className="absolute inset-0 z-0 bg-gradient-to-b from-slate-100 to-slate-200"></div>
+                                        )}
+                                        
+                                        <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white shadow-xl z-10 bg-slate-300 relative">
                                             {c.photo ? <img src={c.photo} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/> : null}
                                         </div>
-                                        <div className="absolute top-4 right-4 w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center text-4xl border-2 border-[#FF9933] group-hover:scale-125 transition-transform duration-300">
+                                        <div className="absolute top-4 right-4 w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center text-4xl border-2 border-[#FF9933] group-hover:scale-125 transition-transform duration-300 z-10">
                                             {c.symbol}
                                         </div>
                                     </div>
-                                    <div className="p-8 flex-1 flex flex-col justify-between">
+                                    <div className="p-8 flex-1 flex flex-col justify-between bg-white z-10">
                                         <div className="text-center mb-8">
                                             <h3 className="font-black text-2xl text-slate-800 uppercase tracking-tight leading-tight">{c.name}</h3>
                                             <p className="text-[#FF9933] font-black tracking-widest text-sm uppercase mt-2">{c.party}</p>
@@ -1269,7 +1278,7 @@ const AdminDashboard = () => {
   
   const [activeTab, setActiveTab] = useState('voters');
   const [voterSubTab, setVoterSubTab] = useState('pending');
-  const [newCandidate, setNewCandidate] = useState({ name: '', party: '', symbol: '', photo: '' });
+  const [newCandidate, setNewCandidate] = useState({ name: '', party: '', symbol: '', photo: '', backgroundUrl: '' });
   const [viewImage, setViewImage] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -1342,7 +1351,7 @@ const AdminDashboard = () => {
       });
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex overflow-hidden relative">
+    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row overflow-hidden relative">
       
       {viewImage && (
           <div className="fixed inset-0 bg-black/90 z-[500] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={() => setViewImage(null)}>
@@ -1352,9 +1361,9 @@ const AdminDashboard = () => {
           </div>
       )}
 
-      <aside className="w-72 bg-[#000080] text-white flex flex-col shadow-2xl relative z-20 shrink-0">
+      <aside className="w-full md:w-72 bg-[#000080] text-white flex flex-col shadow-2xl relative z-20 shrink-0 md:h-screen overflow-y-auto">
         <div className="bg-white pt-8 pb-6 px-4 border-b-4 border-[#FF9933]"><EciAdminSidebarLogo /></div>
-        <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 p-4 space-y-2 mt-4 custom-scrollbar">
           <button onClick={() => handleTabChange('voters')} className={`w-full flex items-center gap-3 p-3.5 rounded-xl font-black uppercase tracking-wide transition-all ${activeTab === 'voters' ? 'bg-white text-[#000080] shadow-md' : 'hover:bg-blue-900/50 text-blue-100'}`}>
               <Users size={20}/> Voter Management {unseenVoters > 0 && <span className="ml-auto bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] animate-pulse">New {unseenVoters}</span>}
           </button>
@@ -1382,31 +1391,25 @@ const AdminDashboard = () => {
             <div className="flex items-center gap-4">
                <div><h1 className="text-2xl font-black uppercase tracking-tight text-slate-800">Chief Electoral Officer</h1><p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Master Dashboard</p></div>
                {pendingUsers.length > 0 && (
-                 <div className="ml-4 bg-red-50 text-red-600 px-4 py-1.5 rounded-full border border-red-200 flex items-center gap-2 shadow-sm animate-pulse cursor-pointer" onClick={() => {handleTabChange('voters'); setVoterSubTab('pending');}}>
+                 <div className="ml-4 bg-red-50 text-red-600 px-4 py-1.5 rounded-full border border-red-200 flex items-center gap-2 shadow-sm animate-pulse cursor-pointer hidden sm:flex" onClick={() => {handleTabChange('voters'); setVoterSubTab('pending');}}>
                     <ShieldAlert size={16}/>
                     <span className="text-xs font-black uppercase tracking-wider">{pendingUsers.length} New KYC Pending!</span>
-                 </div>
-               )}
-               {openTickets.length > 0 && (
-                 <div className="ml-2 bg-orange-50 text-orange-600 px-4 py-1.5 rounded-full border border-orange-200 flex items-center gap-2 shadow-sm animate-pulse cursor-pointer" onClick={() => handleTabChange('tickets')}>
-                    <Ticket size={16}/>
-                    <span className="text-xs font-black uppercase tracking-wider">{openTickets.length} Open Tickets!</span>
                  </div>
                )}
             </div>
             <div className="flex items-center gap-3"><div className="text-right hidden sm:block"><p className="text-sm font-black text-slate-800">Admin_01</p><p className="text-[10px] text-[#138808] font-black uppercase tracking-widest flex items-center gap-1 justify-end"><CheckCircle size={10}/> Authenticated</p></div><div className="w-12 h-12 bg-[#000080] text-white rounded-xl flex items-center justify-center font-black text-xl shadow-md">AD</div></div>
         </header>
 
-        <div className="p-8">
+        <div className="p-4 md:p-8">
           {activeTab === 'voters' && (
             <div className="animate-fade-in-up">
-              <div className="grid grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                  <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 border-l-8 border-l-[#FF9933] relative overflow-hidden"><div className="absolute right-0 top-0 text-orange-100 -mr-4 -mt-4"><Users size={100}/></div><p className="text-sm font-black text-slate-500 uppercase tracking-wider mb-1 relative z-10">Total Registered</p><p className="text-4xl font-black text-slate-800 relative z-10">{users.length}</p></div>
                  <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 border-l-8 border-l-[#000080] relative overflow-hidden"><div className="absolute right-0 top-0 text-blue-50 -mr-4 -mt-4"><Shield size={100}/></div><p className="text-sm font-black text-slate-500 uppercase tracking-wider mb-1 relative z-10">Pending KYC</p><p className="text-4xl font-black text-[#000080] relative z-10">{pendingUsers.length}</p></div>
                  <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 border-l-8 border-l-[#138808] relative overflow-hidden"><div className="absolute right-0 top-0 text-green-50 -mr-4 -mt-4"><CheckCircle size={100}/></div><p className="text-sm font-black text-slate-500 uppercase tracking-wider mb-1 relative z-10">Approved Voters</p><p className="text-4xl font-black text-[#138808] relative z-10">{approvedUsers.length}</p></div>
               </div>
               
-              <div className="flex gap-4 mb-6 border-b border-slate-200 pb-4">
+              <div className="flex flex-col sm:flex-row gap-4 mb-6 border-b border-slate-200 pb-4">
                   <button onClick={() => setVoterSubTab('pending')} className={`px-6 py-2.5 rounded-xl font-black uppercase tracking-wider flex items-center gap-2 transition-colors ${voterSubTab === 'pending' ? 'bg-[#000080] text-white shadow-md' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}><ShieldAlert size={18}/> Manual KYC Queue <span className="bg-white/20 px-2 py-0.5 rounded-md text-xs">({pendingUsers.length})</span></button>
                   <button onClick={() => { setVoterSubTab('all'); handleTabChange('voters'); }} className={`px-6 py-2.5 rounded-xl font-black uppercase tracking-wider flex items-center gap-2 transition-colors ${voterSubTab === 'all' ? 'bg-[#000080] text-white shadow-md' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}><ListFilter size={18}/> All Voters Directory <span className="bg-white/20 px-2 py-0.5 rounded-md text-xs">({users.length})</span></button>
               </div>
@@ -1418,24 +1421,24 @@ const AdminDashboard = () => {
                         <div key={user.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl flex flex-col xl:flex-row gap-8 relative overflow-hidden">
                             <div className="flex-1 space-y-4 z-10">
                                 <div><h3 className="text-2xl font-black text-[#000080] uppercase">{user.firstName} {user.lastName}</h3><p className="font-mono text-lg font-bold text-slate-600 bg-slate-100 inline-block px-3 py-1 rounded-lg mt-1 border border-slate-200">Aadhar: {user.aadharNo}</p></div>
-                                <div className="grid grid-cols-2 gap-4 text-sm font-bold text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner"><p>Mobile: <span className="text-slate-800">{user.mobile}</span></p><p>Email: <span className="text-slate-800">{user.email}</span></p></div>
-                                <div className="flex gap-3 pt-4 border-t border-slate-200">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-bold text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner"><p>Mobile: <span className="text-slate-800">{user.mobile}</span></p><p>Email: <span className="text-slate-800">{user.email}</span></p></div>
+                                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-200">
                                     <button onClick={() => updateKYCStatus(user.id, 'approved')} className="flex-1 bg-[#138808] hover:bg-green-700 text-white py-3.5 rounded-xl font-black uppercase tracking-widest shadow-md transition-colors">Approve KYC</button>
                                     <button onClick={() => updateKYCStatus(user.id, 'rejected')} className="flex-1 bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200 py-3.5 rounded-xl font-black uppercase tracking-widest transition-colors">Reject</button>
-                                    <button onClick={() => { if(window.confirm(`Are you sure you want to PERMANENTLY DELETE ${user.firstName}'s account?`)) deleteUser(user.id); }} className="px-6 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 rounded-xl transition-colors shadow-sm" title="Delete User Permanently"><Trash2 size={22}/></button>
+                                    <button onClick={() => { if(window.confirm(`Are you sure you want to PERMANENTLY DELETE ${user.firstName}'s account?`)) deleteUser(user.id); }} className="px-6 py-3.5 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 rounded-xl transition-colors shadow-sm" title="Delete User Permanently"><Trash2 size={22} className="mx-auto"/></button>
                                 </div>
                             </div>
-                            <div className="flex gap-4 items-center justify-center bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner z-10">
+                            <div className="flex flex-col sm:flex-row gap-4 items-center justify-center bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner z-10">
                                 <div className="text-center group relative cursor-pointer" onClick={() => setViewImage(user.aadharPhoto)}>
-                                    <p className="text-xs font-black text-slate-500 uppercase mb-2">Aadhar Image (Click to Zoom)</p>
+                                    <p className="text-xs font-black text-slate-500 uppercase mb-2">Aadhar Image</p>
                                     <div className="w-48 h-32 bg-slate-200 rounded-xl overflow-hidden border-4 border-white shadow-md relative">
                                         <img src={user.aadharPhoto} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/>
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="text-white" size={24}/></div>
                                     </div>
                                 </div>
-                                <div className="w-10 flex justify-center text-slate-300"><RefreshCw size={24}/></div>
+                                <div className="w-10 flex justify-center text-slate-300 rotate-90 sm:rotate-0"><RefreshCw size={24}/></div>
                                 <div className="text-center group relative cursor-pointer" onClick={() => setViewImage(user.facePhoto)}>
-                                    <p className="text-xs font-black text-[#000080] uppercase mb-2">Live Face (Click to Zoom)</p>
+                                    <p className="text-xs font-black text-[#000080] uppercase mb-2">Live Face</p>
                                     <div className="w-32 h-32 bg-slate-200 rounded-full overflow-hidden border-4 border-[#000080] shadow-md relative">
                                         <img src={user.facePhoto} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/>
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="text-white" size={24}/></div>
@@ -1446,7 +1449,7 @@ const AdminDashboard = () => {
                     ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
                   <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                      <input 
                          type="text" 
@@ -1457,12 +1460,12 @@ const AdminDashboard = () => {
                      />
                      <button 
                          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} 
-                         className="bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm hover:bg-slate-100 transition-colors"
+                         className="bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-slate-100 transition-colors w-full sm:w-auto"
                      >
                          <ListFilter size={16}/> Sort A-Z: {sortOrder === 'asc' ? 'A to Z' : 'Z to A'}
                      </button>
                   </div>
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse whitespace-nowrap">
                     <thead className="bg-slate-100 text-xs uppercase tracking-widest text-slate-500 font-black"><tr className="border-b"><th className="p-5">Voter Details</th><th className="p-5">Aadhar Number</th><th className="p-5 text-center">Voting Status</th><th className="p-5 text-center">KYC Status</th><th className="p-5 text-center">Action</th></tr></thead>
                     <tbody>
                       {processedUsers.length === 0 ? <tr><td colSpan="5" className="p-10 text-center font-bold text-slate-400">No records found matching your search.</td></tr> : 
@@ -1488,19 +1491,19 @@ const AdminDashboard = () => {
 
           {activeTab === 'tickets' && (
             <div className="animate-fade-in">
-              <div className="flex justify-between items-end mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
                  <div>
                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-wide flex items-center gap-2"><Ticket className="text-[#FF9933]"/> Voter Support Tickets</h3>
                     <p className="text-sm text-slate-500">Resolve issues reported by citizens during registration or voting.</p>
                  </div>
-                 <div className="flex gap-4 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                 <div className="flex gap-4 bg-white p-2 rounded-lg border border-slate-200 shadow-sm w-full sm:w-auto justify-around">
                     <div className="text-center px-4 border-r"><p className="text-xs font-bold text-slate-400 uppercase">Open</p><p className="font-black text-orange-500 text-lg">{openTickets.length}</p></div>
                     <div className="text-center px-4"><p className="text-xs font-bold text-slate-400 uppercase">Resolved</p><p className="font-black text-green-500 text-lg">{(tickets || []).length - openTickets.length}</p></div>
                  </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left border-collapse">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                     <thead className="bg-slate-100 text-xs uppercase tracking-widest text-slate-500 font-black">
                       <tr className="border-b border-slate-200">
                          <th className="p-4">Voter details</th>
@@ -1520,7 +1523,7 @@ const AdminDashboard = () => {
                                      <p className="text-xs font-bold text-slate-500 flex items-center gap-1 mt-1"><Phone size={12}/> {ticket.userMobile}</p>
                                  </td>
                                  <td className="p-4">
-                                     <div className="bg-orange-50 text-orange-900 p-3 rounded-lg border border-orange-100 text-sm font-medium">
+                                     <div className="bg-orange-50 text-orange-900 p-3 rounded-lg border border-orange-100 text-sm font-medium whitespace-normal">
                                         {ticket.message}
                                      </div>
                                      <p className="text-[10px] text-slate-400 font-bold mt-2">{new Date(ticket.createdAt).toLocaleString()}</p>
@@ -1533,7 +1536,7 @@ const AdminDashboard = () => {
                                  </td>
                                  <td className="p-4 text-right">
                                      {ticket.status === 'open' && (
-                                         <button onClick={() => resolveTicket(ticket)} className="bg-white border border-slate-300 text-slate-700 hover:text-green-600 hover:border-green-300 hover:bg-green-50 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto">
+                                         <button onClick={() => resolveTicket(ticket)} className="bg-white border border-slate-300 text-slate-700 hover:text-green-600 hover:border-green-300 hover:bg-green-50 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1 ml-auto w-full sm:w-auto">
                                             <CheckSquare size={14}/> Mark Resolved
                                          </button>
                                      )}
@@ -1549,25 +1552,49 @@ const AdminDashboard = () => {
 
           {activeTab === 'candidates' && (
               <div className="flex flex-col xl:flex-row gap-8 animate-fade-in-up">
-                  <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+                  <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8">
                       <h3 className="font-black text-xl mb-6 text-[#000080] uppercase tracking-wide border-b pb-4 flex justify-between items-center">Registered Parties <span className="bg-blue-50 text-blue-700 px-3 py-1 text-sm rounded-lg">{candidates.length} Setup</span></h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {candidates.map(c => (
-                              <div key={c.id} className="border border-slate-200 rounded-2xl p-5 flex items-center gap-5 shadow-sm hover:shadow-md transition-shadow bg-slate-50"><img src={c.photo} className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-sm" onError={(e)=>e.target.style.display='none'}/><div><p className="font-black text-lg text-slate-800 uppercase leading-tight">{c.name}</p><p className="text-sm font-black text-[#FF9933] tracking-widest uppercase">{c.party}</p><p className="bg-white border inline-block px-3 py-1 rounded-lg mt-2 text-xl shadow-sm">{c.symbol}</p></div>
-                                <button onClick={() => {if(window.confirm("Delete Candidate?")) deleteCandidate(c.id);}} className="ml-auto text-slate-400 hover:text-red-500 p-2"><Trash2 size={18}/></button>
+                              <div key={c.id} className="border border-slate-200 rounded-2xl p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow bg-white relative overflow-hidden">
+                                {/* NAYA: Admin candidate list me background flag */}
+                                {c.backgroundUrl && <img src={c.backgroundUrl} className="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none" alt="party background" />}
+                                
+                                <div className="flex items-center gap-4 relative z-10">
+                                   <img src={c.photo || "https://via.placeholder.com/50"} className="w-16 h-16 rounded-full object-cover border-2 border-slate-200 bg-slate-100"/>
+                                   <div>
+                                       <p className="font-black text-slate-800 uppercase tracking-tight">{c.name}</p>
+                                       <p className="text-sm font-bold text-[#FF9933]">{c.party} <span className="text-slate-400">|</span> Symbol: {c.symbol}</p>
+                                   </div>
+                                </div>
+                                <div className="flex gap-2 relative z-10">
+                                    <button onClick={() => {if(window.confirm("Delete Candidate?")) deleteCandidate(c.id);}} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white border border-slate-200 shadow-sm" title="Delete"><Trash2 size={18}/></button>
+                                </div>
                               </div>
                           ))}
                       </div>
                   </div>
-                  <div className="w-full xl:w-[450px] bg-white rounded-3xl shadow-sm border border-slate-200 p-8 border-t-8 border-t-[#138808] self-start sticky top-28">
+                  <div className="w-full xl:w-[450px] bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8 border-t-8 border-t-[#138808] self-start sticky top-28">
                       <h3 className="font-black text-xl mb-6 text-slate-800 uppercase tracking-wide flex items-center gap-2"><UserPlus size={24} className="text-[#138808]"/> Add Candidate</h3>
-                      <form onSubmit={(e)=>{e.preventDefault(); addCandidate(newCandidate); setNewCandidate({name:'', party:'', symbol:'', photo:''}); alert("Candidate Added");}} className="space-y-5">
+                      <form onSubmit={(e)=>{e.preventDefault(); addCandidate(newCandidate); setNewCandidate({name:'', party:'', symbol:'', photo:'', backgroundUrl: ''}); alert("Candidate Added");}} className="space-y-5">
                           <div><label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Candidate Full Name</label><input type="text" required value={newCandidate.name} onChange={e=>setNewCandidate({...newCandidate, name:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-3.5 rounded-xl font-bold focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none" placeholder="E.g. Narendra Modi" /></div>
                           <div><label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Political Party</label><input type="text" required value={newCandidate.party} onChange={e=>setNewCandidate({...newCandidate, party:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-3.5 rounded-xl font-bold focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none" placeholder="E.g. BJP" /></div>
-                          <div className="flex gap-4">
-                            <div className="w-1/3"><label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Symbol</label><input type="text" required value={newCandidate.symbol} onChange={e=>setNewCandidate({...newCandidate, symbol:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-3.5 rounded-xl font-bold text-2xl text-center focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none" placeholder="🪷" /></div>
-                            <div className="w-2/3"><label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Photo URL</label><input type="url" required value={newCandidate.photo} onChange={e=>setNewCandidate({...newCandidate, photo:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-3.5 rounded-xl font-bold focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none" placeholder="https://..." /></div>
+                          <div>
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Symbol (Emoji)</label>
+                            <input type="text" required value={newCandidate.symbol} onChange={e=>setNewCandidate({...newCandidate, symbol:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-3.5 rounded-xl font-bold text-2xl text-center focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none" placeholder="🪷" />
                           </div>
+                          
+                          <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex-1">
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block flex items-center gap-1"><ImageIcon size={14}/> Photo URL</label>
+                                <input type="url" required value={newCandidate.photo} onChange={e=>setNewCandidate({...newCandidate, photo:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-2.5 rounded-lg focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none text-sm" placeholder="Profile Pic URL" />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block flex items-center gap-1"><ImageIcon size={14}/> Flag URL</label>
+                                <input type="url" value={newCandidate.backgroundUrl || ''} onChange={e=>setNewCandidate({...newCandidate, backgroundUrl:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-2.5 rounded-lg focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none text-sm" placeholder="Party Flag URL (Opt)" />
+                            </div>
+                          </div>
+                          
                           <button type="submit" className="w-full mt-4 bg-[#138808] text-white py-4 rounded-xl font-black shadow-lg hover:bg-green-700 uppercase tracking-widest flex justify-center gap-2"><Upload size={18}/> Register Party</button>
                       </form>
                   </div>
@@ -1578,21 +1605,21 @@ const AdminDashboard = () => {
             <div className="max-w-4xl mx-auto animate-fade-in-up">
                 <div className="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden text-center mb-8">
                     <div className="bg-[#000080] p-8 text-white"><Activity size={60} className="mx-auto mb-4 opacity-90"/><h3 className="text-3xl font-black uppercase tracking-widest">Election Phase Control</h3><p className="font-bold text-blue-200 mt-2 tracking-wide uppercase">Manage Voter Portal Access</p></div>
-                    <div className="p-10">
-                        <div className="inline-flex flex-col md:flex-row gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner">
-                            <button onClick={() => updateConfig({electionStatus: 'upcoming'})} className={`px-10 py-6 rounded-xl font-black uppercase tracking-widest transition-all ${config?.electionStatus === 'upcoming' ? 'bg-[#FF9933] text-white shadow-lg scale-105' : 'bg-white border text-slate-400 hover:text-slate-600'}`}>1. Pre-Poll Setup</button>
-                            <button onClick={() => updateConfig({electionStatus: 'active'})} className={`px-10 py-6 rounded-xl font-black uppercase tracking-widest transition-all ${config?.electionStatus === 'active' ? 'bg-[#138808] text-white shadow-lg scale-105' : 'bg-white border text-slate-400 hover:text-slate-600'}`}>2. Start Polling</button>
-                            <button onClick={() => updateConfig({electionStatus: 'completed'})} className={`px-10 py-6 rounded-xl font-black uppercase tracking-widest transition-all ${config?.electionStatus === 'completed' ? 'bg-[#000080] text-white shadow-lg scale-105' : 'bg-white border text-slate-400 hover:text-slate-600'}`}>3. Conclude Election</button>
+                    <div className="p-6 md:p-10">
+                        <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner">
+                            <button onClick={() => updateConfig({electionStatus: 'upcoming'})} className={`px-6 md:px-10 py-4 md:py-6 rounded-xl font-black uppercase tracking-widest transition-all ${config?.electionStatus === 'upcoming' ? 'bg-[#FF9933] text-white shadow-lg scale-105' : 'bg-white border text-slate-400 hover:text-slate-600'}`}>1. Pre-Poll</button>
+                            <button onClick={() => updateConfig({electionStatus: 'active'})} className={`px-6 md:px-10 py-4 md:py-6 rounded-xl font-black uppercase tracking-widest transition-all ${config?.electionStatus === 'active' ? 'bg-[#138808] text-white shadow-lg scale-105' : 'bg-white border text-slate-400 hover:text-slate-600'}`}>2. Start Polling</button>
+                            <button onClick={() => updateConfig({electionStatus: 'completed'})} className={`px-6 md:px-10 py-4 md:py-6 rounded-xl font-black uppercase tracking-widest transition-all ${config?.electionStatus === 'completed' ? 'bg-[#000080] text-white shadow-lg scale-105' : 'bg-white border text-slate-400 hover:text-slate-600'}`}>3. Conclude</button>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-red-50 rounded-3xl shadow-sm border border-red-200 overflow-hidden p-8 mt-12 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="bg-red-50 rounded-3xl shadow-sm border border-red-200 overflow-hidden p-6 md:p-8 mt-8 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
                     <div>
-                        <h3 className="text-xl font-black text-red-700 uppercase flex items-center gap-2"><ShieldAlert/> Danger Zone: Reset Election</h3>
+                        <h3 className="text-xl font-black text-red-700 uppercase flex items-center justify-center md:justify-start gap-2"><ShieldAlert/> Danger Zone: Reset Election</h3>
                         <p className="text-red-600 font-bold text-sm mt-1">This will clear ALL current votes and allow ALL registered voters to vote again in a new election cycle.</p>
                     </div>
-                    <button onClick={handleResetElection} className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest shadow-md transition-colors whitespace-nowrap">
+                    <button onClick={handleResetElection} className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest shadow-md transition-colors whitespace-nowrap w-full md:w-auto">
                        Reset & Start New
                     </button>
                 </div>
@@ -1601,14 +1628,14 @@ const AdminDashboard = () => {
 
           {activeTab === 'results' && (
             <div className="max-w-5xl mx-auto animate-fade-in-up">
-                <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-end mb-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                    <div><h3 className="text-3xl font-black text-[#000080] uppercase tracking-wide flex items-center gap-3"><BarChart3 size={32}/> Live Vote Analytics</h3><p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Real-time ledger counting</p></div>
-                    <button onClick={handlePublishResults} className={`px-8 py-3.5 rounded-xl font-black uppercase tracking-widest flex items-center gap-2 shadow-md transition-all ${config?.resultsPublished ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-[#138808] text-white'}`}>
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                    <div><h3 className="text-2xl sm:text-3xl font-black text-[#000080] uppercase tracking-wide flex items-center gap-3"><BarChart3 size={32}/> Live Vote Analytics</h3><p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Real-time ledger counting</p></div>
+                    <button onClick={handlePublishResults} className={`w-full sm:w-auto px-8 py-3.5 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-md transition-all ${config?.resultsPublished ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-[#138808] text-white'}`}>
                         {config?.resultsPublished ? <><EyeOff size={18}/> Unpublish Results</> : <><Eye size={18}/> Publish to Public</>}
                     </button>
                 </div>
 
-                <div className="bg-white rounded-3xl shadow-md border border-slate-200 p-8 space-y-8">
+                <div className="bg-white rounded-3xl shadow-md border border-slate-200 p-6 md:p-8 space-y-8">
                     {candidates.length === 0 ? <p className="text-center font-bold text-slate-400 py-10">No candidates available.</p> : 
                      calculateResults().map((c, index) => {
                          const total = Object.values(config?.votes || {}).reduce((a,b)=>a+b,0) || 1;
@@ -1616,8 +1643,11 @@ const AdminDashboard = () => {
                          return (
                             <div key={c.id} className="relative">
                                 <div className="flex justify-between items-end mb-3">
-                                    <div className="flex items-center gap-4"><div className="w-14 h-14 rounded-full border-4 border-slate-100 overflow-hidden bg-slate-200"><img src={c.photo} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/></div><div><p className="font-black text-xl text-slate-800 uppercase flex gap-2">{c.party} {index === 0 && c.votes > 0 && <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-0.5 rounded uppercase tracking-widest border border-yellow-300">Leading</span>}</p><p className="text-xs font-bold text-slate-500 uppercase">{c.name}</p></div></div>
-                                    <div className="text-right"><p className="text-4xl font-black text-[#000080] tracking-tighter">{c.votes}</p></div>
+                                    <div className="flex items-center gap-3 sm:gap-4">
+                                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-4 border-slate-100 overflow-hidden bg-slate-200 shrink-0"><img src={c.photo} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/></div>
+                                        <div><p className="font-black text-lg sm:text-xl text-slate-800 uppercase flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">{c.party} {index === 0 && c.votes > 0 && <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-0.5 rounded uppercase tracking-widest border border-yellow-300 w-max">Leading</span>}</p><p className="text-xs font-bold text-slate-500 uppercase">{c.name}</p></div>
+                                    </div>
+                                    <div className="text-right"><p className="text-3xl sm:text-4xl font-black text-[#000080] tracking-tighter">{c.votes}</p></div>
                                 </div>
                                 <div className="w-full h-6 bg-slate-100 rounded-full border border-slate-200 shadow-inner relative">
                                     <div className="h-full bg-gradient-to-r from-[#FF9933] via-orange-400 to-[#138808] rounded-full transition-all duration-1000 ease-out flex items-center justify-end px-3" style={{width: `${percentage}%`}}><span className="text-[10px] font-black text-white drop-shadow-md">{percentage}%</span></div>
@@ -1631,13 +1661,15 @@ const AdminDashboard = () => {
 
           {activeTab === 'logs' && (
             <div className="animate-fade-in-up">
-              <div className="flex justify-between mb-6">
-                 <h3 className="text-2xl font-black text-slate-800 uppercase flex items-center gap-2"><ShieldAlert size={28} className="text-[#000080]"/> Immutable Audit Trail</h3>
-                 <button onClick={() => {if(window.confirm("Clear all logs?")) clearLogs();}} className="bg-red-50 text-red-600 font-bold px-4 py-2 rounded-lg border border-red-200 hover:bg-red-100 flex items-center gap-2"><Trash2 size={16}/> Clear Logs</button>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                 <div>
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-800 uppercase flex items-center gap-2"><ShieldAlert size={28} className="text-[#000080]"/> Immutable Audit Trail</h3>
+                 </div>
+                 <button onClick={() => {if(window.confirm("Clear all logs?")) clearLogs();}} className="bg-red-50 text-red-600 font-bold px-4 py-2 rounded-lg border border-red-200 hover:bg-red-100 flex items-center justify-center gap-2 w-full sm:w-auto"><Trash2 size={16}/> Clear Logs</button>
               </div>
-              <div className="bg-slate-900 rounded-3xl shadow-xl border-4 border-slate-800 font-mono text-sm overflow-hidden">
-                  <div className="p-5 border-b-2 border-slate-700 flex bg-slate-950 text-slate-400 font-black tracking-widest uppercase"><div className="w-1/4">Timestamp (IST)</div><div className="w-1/4">System Action</div><div className="w-1/2">Event Details Hash</div></div>
-                  <div className="max-h-[60vh] overflow-y-auto p-2 custom-scrollbar-dark">
+              <div className="bg-slate-900 rounded-3xl shadow-xl border-4 border-slate-800 font-mono text-sm overflow-hidden overflow-x-auto">
+                  <div className="p-5 border-b-2 border-slate-700 flex bg-slate-950 text-slate-400 font-black tracking-widest uppercase min-w-[600px]"><div className="w-1/4">Timestamp (IST)</div><div className="w-1/4">System Action</div><div className="w-1/2">Event Details Hash</div></div>
+                  <div className="max-h-[60vh] overflow-y-auto p-2 custom-scrollbar-dark min-w-[600px]">
                       {logs.length === 0 ? <div className="p-10 text-center text-slate-600 font-bold uppercase tracking-widest">No audit logs found.</div> : 
                        logs.map((log, i) => (
                           <div key={i} className="flex p-4 border-b border-slate-800/50 hover:bg-slate-800 transition-colors">
@@ -1660,6 +1692,17 @@ const AdminDashboard = () => {
 // MAIN ROUTER (ENTRY POINT)
 // =========================================================================
 export default function App() {
+  useEffect(() => {
+    // Mobile Viewport Fix
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = "viewport";
+      document.head.appendChild(meta);
+    }
+    meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0";
+  }, []);
+
   return (
     <>
       <style dangerouslySetInnerHTML={{__html: `
