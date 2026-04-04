@@ -20,8 +20,10 @@ import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, addDoc, d
 // =========================================================================
 export const sendCustomEmail = async (to_email, subject, message) => {
   const SERVICE_ID = 'service_6p41jep'; 
-  const TEMPLATE_ID = 'template_gtv5x88'; 
+  const TEMPLATE_ID = 'template_qbfvvag'; 
   const PUBLIC_KEY = '5BgUEGlUJN3pofcYM'; 
+
+  console.log(`Attempting to send email to: ${to_email}`);
 
   try {
     const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -31,12 +33,25 @@ export const sendCustomEmail = async (to_email, subject, message) => {
         service_id: SERVICE_ID,
         template_id: TEMPLATE_ID,
         user_id: PUBLIC_KEY,
-        template_params: { to_email, subject, message }
+        template_params: { 
+            to_email: to_email, 
+            subject: subject, 
+            message: message 
+        }
       })
     });
-    return res.ok;
+    
+    if (res.ok) {
+        console.log("EmailJS: Email sent successfully! ✅");
+        return true;
+    } else {
+        // Agar fail hua, toh exact reason console me print karega
+        const errorText = await res.text();
+        console.error("EmailJS Failed to send ❌:", errorText);
+        return false;
+    }
   } catch (e) {
-    console.error("EmailJS Error:", e);
+    console.error("EmailJS Network Error:", e);
     return false;
   }
 };
@@ -1519,6 +1534,7 @@ const UserDashboard = () => {
                                     {candidates.map(c => (
                                         <div key={c.id} className="bg-white rounded-3xl shadow-md hover:shadow-2xl transition-all overflow-hidden border border-slate-200 group flex flex-col transform hover:-translate-y-2 relative">
                                             <div className="h-56 relative p-6 flex items-center justify-center border-b border-slate-200 overflow-hidden bg-slate-100">
+                                                {/* NAYA: Background Image Display */}
                                                 {c.backgroundUrl ? (
                                                   <div className="absolute inset-0 z-0">
                                                     <img src={c.backgroundUrl} className="w-full h-full object-cover opacity-20" alt="background"/>
@@ -1862,6 +1878,7 @@ const AdminDashboard = () => {
                                         "{ticket.message}"
                                      </div>
                                      
+                                     {/* NAYA: Admin Reply Interface */}
                                      {ticket.status === 'open' ? (
                                          <div className="flex gap-2">
                                             <input 
