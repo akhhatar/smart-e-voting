@@ -102,7 +102,7 @@ const loadModels = async () => {
     ]);
     return true;
   } catch (error) {
-    console.error("Face AI Model Error:", error);
+    console.error("Face AI Model Error. Check /public/models folder.", error);
     return false;
   }
 };
@@ -304,6 +304,8 @@ const VotingProvider = ({ children }) => {
       const user = users.find(u => (u.aadharNo === loginId || u.email === loginId || u.mobile === loginId) && u.password === hashedInputPassword);
       
       if (user) {
+          if(user.status === 'pending') throw new Error("Your KYC is pending Admin verification.");
+          if(user.status === 'rejected') throw new Error("Your KYC was rejected.");
           setLoggedInUserId(user.id);
           await logAction('USER_LOGIN', `Voter Logged in: ${user.aadharNo.slice(-4)}`);
           showToast(`Welcome back, ${user.firstName}!`, "success");
@@ -315,6 +317,8 @@ const VotingProvider = ({ children }) => {
   const loginByFace = async (userId) => {
       const user = users.find(u => u.id === userId);
       if (user) {
+          if(user.status === 'pending') throw new Error("KYC pending Admin approval.");
+          if(user.status === 'rejected') throw new Error("KYC rejected.");
           setLoggedInUserId(userId);
           await logAction('FACE_LOGIN', `Verified via Biometrics`);
           showToast(`Biometric Login Successful, ${user.firstName}!`, "success");
@@ -342,12 +346,10 @@ const VotingProvider = ({ children }) => {
       return true;
   };
 
-  // NAYA: Re-KYC Update Request
   const requestKycUpdate = async (userId, newKycData) => {
       if(!db) return;
       const user = users.find(u => u.id === userId);
       
-      // Store current data as backup for safe rejection
       const backup = {
           aadharPhoto: user.aadharPhoto,
           facePhoto: user.facePhoto,
@@ -360,7 +362,7 @@ const VotingProvider = ({ children }) => {
           facePhoto: newKycData.facePhoto,
           faceDescriptor: newKycData.faceDescriptor,
           backupKyc: backup,
-          status: 'pending' // Moves back to pending queue
+          status: 'pending'
       });
       await logAction('KYC_UPDATE_REQUESTED', `User ID: ${userId}`);
       showToast("Re-KYC Request Submitted! Account Suspended temporarily.", "info");
@@ -389,7 +391,7 @@ const VotingProvider = ({ children }) => {
       const user = users.find(u => u.id === userId);
       await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), { 
           status: 'approved',
-          backupKyc: null // Clear backup on approve
+          backupKyc: null
       });
       await logAction('KYC_APPROVED', `User ID: ${userId}`);
       if(user) sendCustomEmail(user.email, "KYC Approved - ECI", "Congratulations! Your KYC document and biometric verification is successful. You can now participate in elections.");
@@ -400,7 +402,6 @@ const VotingProvider = ({ children }) => {
       if(!db) return;
       const user = users.find(u => u.id === userId);
       
-      // Safe Reject: If they are updating KYC, revert to old data
       if (user && user.backupKyc) {
           await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), { 
               aadharPhoto: user.backupKyc.aadharPhoto,
@@ -413,7 +414,6 @@ const VotingProvider = ({ children }) => {
           sendCustomEmail(user.email, "Re-KYC Rejected - ECI", "Your recent Re-KYC request was rejected due to blurry images. Your previous KYC profile has been restored.");
           showToast(`Update Rejected. Old Profile Restored.`, 'info');
       } else {
-          // Normal New User Reject
           await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), { status: 'rejected' });
           await logAction('KYC_REJECTED', `User ID: ${userId}`);
           if(user) sendCustomEmail(user.email, "KYC Rejected - ECI", "Your KYC verification failed due to unclear documents or face mismatch. Please login and submit a Re-KYC request.");
@@ -514,7 +514,7 @@ const VotingProvider = ({ children }) => {
       <VotingContext.Provider value={{
           users, currentUser, candidates, logs, tickets, config, loggedInUserId, toasts, showToast,
           register, login, loginByFace, logout, castVote, updateConfig, resetUserPassword, requestKycUpdate,
-          updateKYCStatus, approveUser, rejectUser, deleteUser, addCandidate, updateCandidate, deleteCandidate, updateProfile, 
+          approveUser, rejectUser, deleteUser, addCandidate, updateCandidate, deleteCandidate, updateProfile, 
           resetElection, clearLogs, submitTicket, resolveTicket, dismissTicket, authInitialized
       }}>
           {children}
@@ -831,6 +831,11 @@ const RegisterPage = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) { 
+      // Size check added (1MB Limit for Firebase)
+      if (file.size > 1048576) {
+          showToast("Aadhar photo must be less than 1MB", "error");
+          return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
           setFormData({ ...formData, aadharPhoto: reader.result });
@@ -979,7 +984,7 @@ const RegisterPage = () => {
               <div><label className="block text-xs font-black text-slate-500 mb-1.5 uppercase">12-Digit Aadhar Number</label><input name="aadharNo" type="text" required value={formData.aadharNo} onChange={handleAadharChange} className="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-center tracking-[0.2em] font-mono text-xl font-bold focus:ring-2 focus:ring-[#000080] outline-none" placeholder="XXXX XXXX XXXX"/></div>
               <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center relative bg-white">
                 <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
-                {formData.aadharPhoto ? <img src={formData.aadharPhoto} className="h-40 mx-auto object-contain rounded-lg" alt="Preview"/> : <div><Upload size={40} className="mx-auto mb-2 text-[#000080] opacity-80"/><p className="font-black text-slate-700">Upload Aadhar Image</p><p className="text-xs text-slate-500 font-bold mt-1">Clear front-side photo</p></div>}
+                {formData.aadharPhoto ? <img src={formData.aadharPhoto} className="h-40 mx-auto object-contain rounded-lg" alt="Preview"/> : <div><Upload size={40} className="mx-auto mb-2 text-[#000080] opacity-80"/><p className="font-black text-slate-700">Upload Aadhar Image (Max 1MB)</p><p className="text-xs text-slate-500 font-bold mt-1">Clear front-side photo</p></div>}
               </div>
               <div className="flex gap-4"><button onClick={() => setStep(1)} className="flex-1 bg-slate-200 p-3.5 rounded-xl font-black uppercase tracking-wider">Back</button><button onClick={() => setStep(3)} disabled={formData.aadharNo.length !== 12 || !formData.aadharPhoto} className="flex-1 bg-[#000080] text-white p-3.5 rounded-xl font-black disabled:opacity-50 uppercase tracking-wider">Next: Biometric</button></div>
             </div>
@@ -1019,7 +1024,7 @@ const RegisterPage = () => {
 const UserDashboard = () => {
   const navigate = useNavigate();
   const videoRef = useRef(null);
-  const kycVideoRef = useRef(null); // NAYA: For Re-KYC camera
+  const kycVideoRef = useRef(null); 
   
   const { currentUser, users, candidates, castVote, logout, updateProfile, submitTicket, config, loggedInUserId, tickets, dismissTicket, showToast, requestKycUpdate } = useVoting();
   
@@ -1035,7 +1040,7 @@ const UserDashboard = () => {
   const [supportMessage, setSupportMessage] = useState('');
   const [ticketSubmitted, setTicketSubmitted] = useState(false);
 
-  // NAYA: Re-KYC States
+  // Re-KYC States
   const [kycModalOpen, setKycModalOpen] = useState(false);
   const [kycStep, setKycStep] = useState(1);
   const [kycData, setKycData] = useState({ aadharPhoto: null, facePhoto: null, faceDescriptor: null });
@@ -1085,6 +1090,21 @@ const UserDashboard = () => {
     }
   };
 
+  const handleProfileImageChange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+          if (file.size > 1048576) {
+              showToast("Profile photo must be less than 1MB", "error");
+              return;
+          }
+          const reader = new FileReader();
+          reader.onloadend = () => { 
+              updateProfile(currentUser.id, { photo: reader.result });
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
   const handleSendPasswordResetLink = async (e) => {
       e.preventDefault();
       showToast("Requesting secure link...", "info");
@@ -1114,10 +1134,13 @@ const UserDashboard = () => {
       })).sort((a,b) => b.votes - a.votes);
   };
 
-  // NAYA: Re-KYC functions
   const handleKycFileChange = (e) => {
     const file = e.target.files[0];
     if (file) { 
+      if (file.size > 1048576) {
+          showToast("Aadhar photo must be less than 1MB", "error");
+          return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => { setKycData({ ...kycData, aadharPhoto: reader.result }); };
       reader.readAsDataURL(file);
@@ -1153,7 +1176,7 @@ const UserDashboard = () => {
 
     if (users && kycData.faceDescriptor) {
         const isDuplicateFace = users.some(user => {
-            if (user.id === currentUser.id) return false; // ignore self
+            if (user.id === currentUser.id) return false; 
             if (!user.faceDescriptor) return false;
             return calculateDistance(user.faceDescriptor, kycData.faceDescriptor) < 0.45; 
         });
@@ -1181,7 +1204,7 @@ const UserDashboard = () => {
       <div className="p-6 flex flex-col items-center bg-slate-50 relative">
         <div className="absolute top-4 right-4 text-[#000080] opacity-5"><ShieldCheck size={100}/></div>
         <div className="w-32 h-32 rounded-xl border-4 border-white shadow-lg overflow-hidden mb-4 z-10 bg-slate-200">
-           {currentUser.facePhoto ? <img src={currentUser.facePhoto} className="w-full h-full object-cover" alt="Voter" /> : <div className="w-full h-full flex items-center justify-center text-slate-400">Photo</div>}
+           {currentUser.photo ? <img src={currentUser.photo} className="w-full h-full object-cover" alt="Voter" /> : currentUser.facePhoto ? <img src={currentUser.facePhoto} className="w-full h-full object-cover" alt="Voter" /> : <div className="w-full h-full flex items-center justify-center text-slate-400">Photo</div>}
         </div>
         <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight z-10">{currentUser.firstName} {currentUser.lastName}</h1>
         <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-1.5 rounded-lg font-mono text-sm font-bold mt-3 shadow-sm tracking-widest z-10">ECI{currentUser.id.slice(-6).toUpperCase()}</div>
@@ -1198,7 +1221,7 @@ const UserDashboard = () => {
   return (
     <div className="min-h-screen bg-slate-100 font-sans pb-20 md:pb-0">
       
-      {/* NAYA: RE-KYC MODAL */}
+      {/* RE-KYC MODAL */}
       {kycModalOpen && (
         <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-sm p-8 flex flex-col items-center border-t-8 border-[#000080] shadow-2xl animate-fade-in-up relative overflow-hidden">
@@ -1230,7 +1253,7 @@ const UserDashboard = () => {
                             <>
                                 <NativeCamera videoRef={kycVideoRef} />
                                 {isKycScanning && <div className="absolute top-0 left-0 h-1.5 bg-[#138808] w-full animate-pulse z-20"></div>}
-                                {!isKycScanning && <button onClick={startKycScanning} className="absolute bottom-4 bg-[#000080] text-white px-4 py-2 rounded-full font-bold shadow-2xl border border-blue-400 text-xs">Capture Face</button>}
+                                {!isKycScanning && <button onClick={startKycScanning} className="absolute bottom-4 bg-[#000080] text-white px-4 py-2 rounded-full font-bold shadow-2xl border border-blue-400 text-xs z-30">Capture Face</button>}
                             </>
                         )}
                     </div>
@@ -1255,7 +1278,7 @@ const UserDashboard = () => {
              <p className="text-xs text-slate-500 font-bold mb-6">Final authentication before casting vote</p>
              <div className="relative w-56 h-56 bg-slate-900 rounded-full overflow-hidden mb-6 border-4 border-[#138808] shadow-inner flex items-center justify-center text-slate-500">
                 <NativeCamera videoRef={videoRef} />
-                {status === 'scanning' && <div className="absolute top-0 left-0 w-full h-2 bg-[#138808] shadow-[0_0_20px_#138808] animate-[scan_1.5s_ease-in-out_infinite]"></div>}
+                {status === 'scanning' && <div className="absolute top-0 left-0 w-full h-2 bg-[#138808] shadow-[0_0_20px_#138808] animate-[scan_1.5s_ease-in-out_infinite] z-20"></div>}
              </div>
              {status === 'idle' && <button onClick={verifyIdentity} className="bg-[#000080] hover:bg-blue-900 text-white px-8 py-3.5 rounded-xl font-black shadow-lg w-full flex justify-center items-center gap-2 transition-all uppercase tracking-widest"><ScanFace size={20}/> Authenticate & Vote</button>}
              {status === 'scanning' && <p className="text-[#FF9933] font-black animate-pulse text-lg uppercase tracking-widest flex items-center gap-2"><Loader2 className="animate-spin"/> Verifying...</p>}
@@ -1418,7 +1441,7 @@ const UserDashboard = () => {
         {activeTab === 'vote' && (
           <div className="animate-fade-in-up">
             
-            {/* NAYA: PENDING & REJECTED KYC BLOCKS FOR VOTING TAB */}
+            {/* PENDING & REJECTED KYC BLOCKS FOR VOTING TAB */}
             {currentUser.status === 'pending' ? (
                 <div className="text-center py-24 bg-white rounded-[2.5rem] shadow-sm border border-yellow-200 max-w-3xl mx-auto">
                     <Loader2 className="w-20 h-20 text-[#FF9933] mx-auto mb-6 animate-spin"/>
@@ -1496,7 +1519,6 @@ const UserDashboard = () => {
                                     {candidates.map(c => (
                                         <div key={c.id} className="bg-white rounded-3xl shadow-md hover:shadow-2xl transition-all overflow-hidden border border-slate-200 group flex flex-col transform hover:-translate-y-2 relative">
                                             <div className="h-56 relative p-6 flex items-center justify-center border-b border-slate-200 overflow-hidden bg-slate-100">
-                                                {/* NAYA: Background Image Display */}
                                                 {c.backgroundUrl ? (
                                                   <div className="absolute inset-0 z-0">
                                                     <img src={c.backgroundUrl} className="w-full h-full object-cover opacity-20" alt="background"/>
@@ -1715,7 +1737,6 @@ const AdminDashboard = () => {
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
                                         <h3 className="text-2xl font-black text-[#000080] uppercase">{user.firstName} {user.lastName}</h3>
-                                        {/* NAYA: Show badge if this is a Re-KYC request */}
                                         {user.backupKyc && <span className="bg-purple-100 text-purple-700 text-[10px] font-black px-3 py-1 rounded-full border border-purple-200 uppercase tracking-widest shadow-sm"><RefreshCw size={10} className="inline mr-1 mb-0.5"/> RE-KYC UPDATE</span>}
                                     </div>
                                     <p className="font-mono text-lg font-bold text-slate-600 bg-slate-100 inline-block px-3 py-1 rounded-lg border border-slate-200">Aadhar: {user.aadharNo}</p>
