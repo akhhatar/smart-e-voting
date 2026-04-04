@@ -6,7 +6,7 @@ import {
   ShieldCheck, RefreshCw, Clock, Info, Settings, LogOut, Download, 
   Users, Trash2, ShieldAlert, Activity, Mail, UserPlus, ListFilter,
   MessageSquare, FileText, BarChart3, Fingerprint, Lock, Shield, X, Maximize2,
-  ChevronLeft, ChevronRight, Phone, AlertCircle, CheckSquare, Ticket, Image as ImageIcon
+  ChevronLeft, ChevronRight, Phone, AlertCircle, CheckSquare, Ticket, Image as ImageIcon, Bell, Edit, Send
 } from 'lucide-react';
 
 // === FIREBASE IMPORTS ===
@@ -19,14 +19,9 @@ import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, addDoc, d
 // 0. EMAIL JS UTILITY (For Custom OTPs & Notifications)
 // =========================================================================
 export const sendCustomEmail = async (to_email, subject, message) => {
-  const SERVICE_ID = 'YOUR_SERVICE_ID'; 
-  const TEMPLATE_ID = 'YOUR_TEMPLATE_ID'; 
-  const PUBLIC_KEY = 'YOUR_PUBLIC_KEY'; 
-
-  if (SERVICE_ID === 'YOUR_SERVICE_ID') {
-    console.log(`\n📧 [MOCK EMAIL GENERATED]\nTo: ${to_email}\nSubject: ${subject}\nMessage: ${message}\n`);
-    return true; 
-  }
+  const SERVICE_ID = 'service_6p41jep'; 
+  const TEMPLATE_ID = 'template_gtv5x88'; 
+  const PUBLIC_KEY = '5BgUEGlUJN3pofcYM'; 
 
   try {
     const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -45,7 +40,6 @@ export const sendCustomEmail = async (to_email, subject, message) => {
     return false;
   }
 };
-
 
 // =========================================================================
 // 1. NATIVE CAMERA COMPONENT
@@ -108,7 +102,7 @@ const loadModels = async () => {
     ]);
     return true;
   } catch (error) {
-    console.error("Face AI Model Error. Check /public/models folder.", error);
+    console.error("Face AI Model Error:", error);
     return false;
   }
 };
@@ -177,6 +171,26 @@ const EciAdminSidebarLogo = () => (
   </div>
 );
 
+const ToastManager = () => {
+    const { toasts } = useVoting();
+    if(toasts.length === 0) return null;
+    
+    return (
+        <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+            {toasts.map(t => (
+                <div key={t.id} className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl animate-fade-in-up border backdrop-blur-md ${
+                    t.type === 'error' ? 'bg-red-600/95 text-white border-red-500' :
+                    t.type === 'info' ? 'bg-[#000080]/95 text-white border-blue-500' :
+                    'bg-[#138808]/95 text-white border-green-500'
+                }`}>
+                    {t.type === 'error' ? <AlertCircle size={24}/> : t.type === 'info' ? <Info size={24}/> : <CheckCircle size={24}/>}
+                    <p className="font-bold text-sm tracking-wide">{t.message}</p>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 // =========================================================================
 // 4. FIREBASE CONTEXT & STATE MANAGEMENT
 // =========================================================================
@@ -194,6 +208,13 @@ const VotingProvider = ({ children }) => {
   const [authInitialized, setAuthInitialized] = useState(false);
   const [db, setDb] = useState(null);
   const [appId, setAppId] = useState('eci-smart-vote');
+
+  const [toasts, setToasts] = useState([]);
+  const showToast = (message, type = 'success') => {
+      const id = Date.now();
+      setToasts(prev => [...prev, { id, message, type }]);
+      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
 
   useEffect(() => {
       try {
@@ -268,6 +289,7 @@ const VotingProvider = ({ children }) => {
       
       await addDoc(collection(db, `artifacts/${appId}/public/data`, 'users'), newUser);
       await logAction('NEW_REGISTRATION', `Aadhar ending in ${userData.aadharNo.slice(-4)}`);
+      showToast("Registration Complete! Pending Admin KYC.", "success");
       return true;
   };
 
@@ -275,16 +297,16 @@ const VotingProvider = ({ children }) => {
       if (loginId === 'admin@eci.gov.in' && password === 'Admin@123') {
           setLoggedInUserId('admin');
           await logAction('ADMIN_LOGIN', 'System Admin logged in');
+          showToast("Welcome Chief Electoral Officer", "info");
           return 'admin';
       }
       const hashedInputPassword = await hashPassword(password);
       const user = users.find(u => (u.aadharNo === loginId || u.email === loginId || u.mobile === loginId) && u.password === hashedInputPassword);
       
       if (user) {
-          if(user.status === 'pending') throw new Error("Aapki KYC Admin verification ke liye pending hai.");
-          if(user.status === 'rejected') throw new Error("Aapki KYC Reject ho chuki hai.");
           setLoggedInUserId(user.id);
           await logAction('USER_LOGIN', `Voter Logged in: ${user.aadharNo.slice(-4)}`);
+          showToast(`Welcome back, ${user.firstName}!`, "success");
           return 'voter';
       }
       throw new Error("Invalid Credentials!");
@@ -293,10 +315,9 @@ const VotingProvider = ({ children }) => {
   const loginByFace = async (userId) => {
       const user = users.find(u => u.id === userId);
       if (user) {
-          if(user.status === 'pending') throw new Error("KYC pending Admin approval.");
-          if(user.status === 'rejected') throw new Error("KYC rejected.");
           setLoggedInUserId(userId);
           await logAction('FACE_LOGIN', `Verified via Biometrics`);
+          showToast(`Biometric Login Successful, ${user.firstName}!`, "success");
           return true;
       }
       return false;
@@ -306,6 +327,7 @@ const VotingProvider = ({ children }) => {
       if(loggedInUserId === 'admin') logAction('ADMIN_LOGOUT', 'System Admin');
       else logAction('USER_LOGOUT', 'Voter Logged out');
       setLoggedInUserId(null);
+      showToast("Securely Logged Out", "info");
   };
 
   const resetUserPassword = async (email, newPassword) => {
@@ -316,7 +338,32 @@ const VotingProvider = ({ children }) => {
       const hashedPassword = await hashPassword(newPassword);
       await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', user.id), { password: hashedPassword });
       await logAction('PASSWORD_RESET', `Password reset for email: ${email}`);
+      showToast("Password Reset Successfully!", "success");
       return true;
+  };
+
+  // NAYA: Re-KYC Update Request
+  const requestKycUpdate = async (userId, newKycData) => {
+      if(!db) return;
+      const user = users.find(u => u.id === userId);
+      
+      // Store current data as backup for safe rejection
+      const backup = {
+          aadharPhoto: user.aadharPhoto,
+          facePhoto: user.facePhoto,
+          faceDescriptor: user.faceDescriptor,
+          status: user.status
+      };
+
+      await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), {
+          aadharPhoto: newKycData.aadharPhoto,
+          facePhoto: newKycData.facePhoto,
+          faceDescriptor: newKycData.faceDescriptor,
+          backupKyc: backup,
+          status: 'pending' // Moves back to pending queue
+      });
+      await logAction('KYC_UPDATE_REQUESTED', `User ID: ${userId}`);
+      showToast("Re-KYC Request Submitted! Account Suspended temporarily.", "info");
   };
 
   const castVote = async (candidateId) => {
@@ -327,63 +374,115 @@ const VotingProvider = ({ children }) => {
       await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'config', 'main'), { votes: newVotes });
       await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', loggedInUserId), { hasVoted: true, voteHash });
       await logAction('VOTE_CAST', `Hash: ${voteHash.substring(0,16)}...`);
+      showToast("Vote Securely Cast & Encrypted!", "success");
   };
 
   const updateConfig = async (updates) => {
       if(!db) return;
       await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'config', 'main'), updates);
       await logAction('SYSTEM_UPDATE', `System config modified`);
+      showToast("Election Phase Updated", "info");
   };
 
-  const updateKYCStatus = async (userId, status) => {
+  const approveUser = async (userId) => {
       if(!db) return;
-      await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), { status });
-      await logAction(`KYC_${status.toUpperCase()}`, `User ID: ${userId}`);
+      const user = users.find(u => u.id === userId);
+      await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), { 
+          status: 'approved',
+          backupKyc: null // Clear backup on approve
+      });
+      await logAction('KYC_APPROVED', `User ID: ${userId}`);
+      if(user) sendCustomEmail(user.email, "KYC Approved - ECI", "Congratulations! Your KYC document and biometric verification is successful. You can now participate in elections.");
+      showToast(`User KYC Approved`, 'success');
+  };
+
+  const rejectUser = async (userId) => {
+      if(!db) return;
+      const user = users.find(u => u.id === userId);
+      
+      // Safe Reject: If they are updating KYC, revert to old data
+      if (user && user.backupKyc) {
+          await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), { 
+              aadharPhoto: user.backupKyc.aadharPhoto,
+              facePhoto: user.backupKyc.facePhoto,
+              faceDescriptor: user.backupKyc.faceDescriptor,
+              status: user.backupKyc.status,
+              backupKyc: null
+          });
+          await logAction('KYC_UPDATE_REJECTED', `Reverted to old KYC for User: ${userId}`);
+          sendCustomEmail(user.email, "Re-KYC Rejected - ECI", "Your recent Re-KYC request was rejected due to blurry images. Your previous KYC profile has been restored.");
+          showToast(`Update Rejected. Old Profile Restored.`, 'info');
+      } else {
+          // Normal New User Reject
+          await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), { status: 'rejected' });
+          await logAction('KYC_REJECTED', `User ID: ${userId}`);
+          if(user) sendCustomEmail(user.email, "KYC Rejected - ECI", "Your KYC verification failed due to unclear documents or face mismatch. Please login and submit a Re-KYC request.");
+          showToast(`User KYC Rejected`, 'error');
+      }
   };
 
   const deleteUser = async (userId) => {
       if(!db) return;
       await deleteDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId));
       await logAction('USER_DELETED', `Admin deleted User ID: ${userId}`);
+      showToast("User Permanently Deleted", "info");
   };
 
   const addCandidate = async (candidateData) => {
       if(!db) return;
       await addDoc(collection(db, `artifacts/${appId}/public/data`, 'candidates'), candidateData);
       await logAction('CANDIDATE_ADDED', `Party: ${candidateData.party}`);
+      showToast("New Party/Candidate Added", "success");
+  };
+
+  const updateCandidate = async (candidateId, candidateData) => {
+      if(!db) return;
+      await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'candidates', candidateId), candidateData);
+      await logAction('CANDIDATE_UPDATED', `Party: ${candidateData.party}`);
+      showToast("Candidate Profile Updated", "success");
   };
 
   const deleteCandidate = async (candidateId) => {
       if(!db) return;
       await deleteDoc(doc(db, `artifacts/${appId}/public/data`, 'candidates', candidateId));
       await logAction('CANDIDATE_DELETED', `Candidate removed.`);
+      showToast("Candidate Removed", "info");
   };
 
   const updateProfile = async (userId, data) => {
       if(!db) return;
       await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', userId), data);
       await logAction('PROFILE_UPDATE', `User ID: ${userId}`);
+      showToast("Profile Updated Successfully", "success");
   };
 
   const submitTicket = async (userId, userName, userMobile, userEmail, message) => {
       if(!db) return;
       await addDoc(collection(db, `artifacts/${appId}/public/data`, 'tickets'), {
-          userId, userName, userMobile, userEmail, message, status: 'open', createdAt: new Date().toISOString()
+          userId, userName, userMobile, userEmail, message, status: 'open', adminReply: '', createdAt: new Date().toISOString()
       });
       await logAction('TICKET_CREATED', `Support requested by: ${userName}`);
+      showToast("Ticket Raised! Admin will review shortly.", "info");
   };
 
-  const resolveTicket = async (ticket) => {
+  const resolveTicket = async (ticket, replyMessage) => {
       if(!db) return;
-      await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'tickets', ticket.id), { status: 'resolved' });
+      await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'tickets', ticket.id), { 
+          status: 'resolved',
+          adminReply: replyMessage || "Resolved by Admin"
+      });
       await logAction('TICKET_RESOLVED', `Admin resolved ticket: ${ticket.id}`);
-      await sendCustomEmail(ticket.userEmail, "Support Ticket Resolved - ECI", `Dear ${ticket.userName},\n\nYour support ticket regarding "${ticket.message}" has been successfully resolved by the Election Commission Support Team.\n\nRegards,\nECI IT Cell`);
+      
+      const emailMsg = `Dear ${ticket.userName},\n\nYour support ticket regarding "${ticket.message}" has been successfully resolved.\n\nAdmin Reply: "${replyMessage || 'Resolved by Support Team'}"\n\nRegards,\nECI IT Cell`;
+      await sendCustomEmail(ticket.userEmail, "Support Ticket Resolved - ECI", emailMsg);
+      showToast("Ticket Resolved & Email Sent to Voter", "success");
   };
 
   const dismissTicket = async (ticketId) => {
       if(!db) return;
       await deleteDoc(doc(db, `artifacts/${appId}/public/data`, 'tickets', ticketId));
       await logAction('TICKET_DISMISSED', `User dismissed ticket: ${ticketId}`);
+      showToast("Ticket Cleared from Dashboard", "info");
   };
 
   const resetElection = async () => {
@@ -394,6 +493,7 @@ const VotingProvider = ({ children }) => {
               if (user.hasVoted) await updateDoc(doc(db, `artifacts/${appId}/public/data`, 'users', user.id), { hasVoted: false, voteHash: null });
           }
           await logAction('ELECTION_RESET', `Admin initialized new election cycle.`);
+          showToast("Election Reset! All votes cleared.", "error");
           return true;
       } catch (err) { console.error("Reset failed", err); return false; }
   };
@@ -403,6 +503,7 @@ const VotingProvider = ({ children }) => {
       for (let log of logs) {
           await deleteDoc(doc(db, `artifacts/${appId}/public/data`, 'logs', log.id));
       }
+      showToast("Audit Logs Cleared", "info");
   };
 
   let currentUser = null;
@@ -411,9 +512,9 @@ const VotingProvider = ({ children }) => {
 
   return (
       <VotingContext.Provider value={{
-          users, currentUser, candidates, logs, tickets, config, loggedInUserId,
-          register, login, loginByFace, logout, castVote, updateConfig, resetUserPassword,
-          updateKYCStatus, deleteUser, addCandidate, deleteCandidate, updateProfile, 
+          users, currentUser, candidates, logs, tickets, config, loggedInUserId, toasts, showToast,
+          register, login, loginByFace, logout, castVote, updateConfig, resetUserPassword, requestKycUpdate,
+          updateKYCStatus, approveUser, rejectUser, deleteUser, addCandidate, updateCandidate, deleteCandidate, updateProfile, 
           resetElection, clearLogs, submitTicket, resolveTicket, dismissTicket, authInitialized
       }}>
           {children}
@@ -426,7 +527,7 @@ const VotingProvider = ({ children }) => {
 // =========================================================================
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, loginByFace, users, resetUserPassword } = useVoting(); 
+  const { login, loginByFace, users, resetUserPassword, showToast } = useVoting(); 
   const videoRef = useRef(null);
   
   const [loginMethod, setLoginMethod] = useState('password'); 
@@ -460,7 +561,10 @@ const LoginPage = () => {
         const role = await login(loginId.trim(), password);
         if(role === 'admin') navigate('/admin');
         else navigate('/dashboard');
-    } catch(err) { setError(err.message); }
+    } catch(err) { 
+        setError(err.message); 
+        showToast(err.message, "error");
+    }
   };
 
   const handleFaceLogin = async () => {
@@ -473,6 +577,7 @@ const LoginPage = () => {
       const liveDescriptor = await getFaceDescriptor(videoRef); 
       if (!liveDescriptor) {
          setScanStatus("Failed!"); setError("Face not detected. Ensure good lighting.");
+         showToast("Face not detected. Adjust lighting.", "error");
          setIsScanning(false); return;
       }
       
@@ -485,12 +590,14 @@ const LoginPage = () => {
           try {
               await loginByFace(targetUser.id);
               setTimeout(() => navigate('/dashboard'), 1500);
-          } catch(err) { setScanStatus("Access Denied"); setError(err.message); }
+          } catch(err) { setScanStatus("Access Denied"); setError(err.message); showToast(err.message, "error"); }
         } else {
           setScanStatus("Biometric Mismatch!"); setError("Chehra match nahi hua. Kripya dubara koshish karein.");
+          showToast("Biometric Mismatch!", "error");
         }
       } else {
         setScanStatus("User Not Found"); setError("Is ID se koi Biometric data nahi mila.");
+        showToast("No Biometric profile found for this ID.", "error");
       }
     } catch (err) { console.error(err); setError("System processing error."); }
     setIsScanning(false);
@@ -498,24 +605,27 @@ const LoginPage = () => {
 
   const handleSendOTP = async (e) => {
       e.preventDefault();
-      const userExists = users.some(u => u.email === forgotEmail);
+      const userExists = users.find(u => u.email === forgotEmail);
       if (!userExists) {
-          alert("This email is not registered in our system.");
+          showToast("This email is not registered.", "error");
           return;
       }
 
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(otp);
       setOtpSent(true);
+      showToast("Generating OTP...", "info");
 
       const isEmailConfigured = await sendCustomEmail(
           forgotEmail, 
           "ECI Portal - Password Reset OTP", 
-          `Your OTP for E-Voting Portal password reset is: ${otp}. Please do not share this OTP with anyone.`
+          `Hello ${userExists.firstName},\n\nYour OTP for E-Voting Portal password reset is: ${otp}.\n\nPlease do not share this OTP with anyone.\n\nRegards,\nElection Commission`
       );
 
       if (!isEmailConfigured) {
-          alert("NOTE FOR DEV: EmailJS is not configured yet. Please check the Console (F12) to see your Mock OTP for testing.");
+          showToast("Dev Mode: Check F12 Console for OTP", "info");
+      } else {
+          showToast(`OTP Sent securely to ${forgotEmail}`, "success");
       }
   };
 
@@ -534,10 +644,10 @@ const LoginPage = () => {
                   setNewPassword('');
               }, 3000);
           } catch (err) {
-              alert(err.message);
+              showToast(err.message, "error");
           }
       } else {
-          alert("Invalid OTP! Please check your email and try again.");
+          showToast("Invalid OTP entered!", "error");
       }
   };
 
@@ -667,11 +777,11 @@ const LoginPage = () => {
 // =========================================================================
 const RegisterPage = () => {
   const navigate = useNavigate();
-  const { register, users } = useVoting(); 
+  const { register, users, showToast } = useVoting(); 
   const videoRef = useRef(null);
   
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', mobile: '', email: '', password: '', confirmPassword: '', aadharNo: '', aadharPhoto: null, facePhoto: null, faceDescriptor: null });
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', mobile: '', email: '', dob: '', password: '', confirmPassword: '', aadharNo: '', aadharPhoto: null, facePhoto: null, faceDescriptor: null });
   const [modelsLoaded, setModelsLoaded] = useState(false); 
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("Initializing AI Models...");
@@ -690,21 +800,42 @@ const RegisterPage = () => {
   }, []);
 
   const handleTextChange = (e) => {
-    const val = e.target.value.replace(/[^A-Za-z]/g, '');
+    const val = e.target.value.replace(/[^A-Za-z\s]/g, '');
     setFormData({ ...formData, [e.target.name]: val });
   };
   
   const handleMobileChange = (e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) });
-  const handleAadharChange = (e) => setFormData({ ...formData, aadharNo: e.target.value.replace(/\D/g, '').slice(0, 12) });
+  const handleAadharChange = (e) => {
+      let val = e.target.value.replace(/\D/g, '');
+      if (val.length > 12) val = val.slice(0, 12);
+      setFormData({ ...formData, aadharNo: val });
+  };
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
-  const isPasswordValid = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/.test(formData.password);
+  const isPasswordValid = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(formData.password);
+
+  const calculateAge = (dobString) => {
+      if(!dobString) return 0;
+      const today = new Date();
+      const birthDate = new Date(dobString);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+      }
+      return age;
+  };
+  const age = calculateAge(formData.dob);
+  const isAgeValid = formData.dob && age >= 18;
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) { 
       const reader = new FileReader();
-      reader.onloadend = () => setFormData({ ...formData, aadharPhoto: reader.result });
+      reader.onloadend = () => {
+          setFormData({ ...formData, aadharPhoto: reader.result });
+          showToast("Aadhar Uploaded Successfully", "success");
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -720,6 +851,7 @@ const RegisterPage = () => {
         const finalDescriptor = Array.from(totalDescriptor).map(val => val / requiredScans);
         setFormData(prev => ({ ...prev, faceDescriptor: finalDescriptor, facePhoto: captureFrame(videoRef) }));
         setIsScanning(false); setScanStatus("Biometric Captured!");
+        showToast("Biometric Saved!", "success");
         return;
       }
       try {
@@ -757,11 +889,9 @@ const RegisterPage = () => {
             "Registration Successful - ECI Portal", 
             `Dear ${cleanedFormData.firstName},\n\nYour registration for the E-Voting portal is successful. Your application is pending Admin KYC approval. You will be notified once approved.\n\nRegards,\nElection Commission`
           );
-          
-          alert("Registration Successful! Please wait for Admin KYC approval.");
           navigate('/login');
       }
-    } catch (err) { alert(err.message); setIsSubmitting(false); }
+    } catch (err) { showToast(err.message, "error"); setIsSubmitting(false); }
   };
 
   return (
@@ -808,6 +938,13 @@ const RegisterPage = () => {
                   <input name="lastName" required value={formData.lastName} onChange={handleTextChange} className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#000080] outline-none" placeholder="Last Name"/>
                 </div>
               </div>
+              
+              <div>
+                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Date of Birth</label>
+                 <input name="dob" type="date" required value={formData.dob} max={new Date().toISOString().split("T")[0]} onChange={e => setFormData({...formData, dob: e.target.value})} className={`w-full p-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-[#000080] outline-none ${formData.dob && age < 18 ? 'border-red-500 bg-red-50' : 'border-slate-300'}`} />
+                 {formData.dob && age < 18 && <p className="text-[10px] font-bold text-red-600 mt-1 uppercase tracking-wider">You must be at least 18 years old to register.</p>}
+              </div>
+
               <div>
                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Mobile Number</label>
                  <input name="mobile" type="tel" required value={formData.mobile} onChange={handleMobileChange} className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#000080] outline-none" placeholder="10-Digit Mobile"/>
@@ -830,10 +967,11 @@ const RegisterPage = () => {
               </div>
               {formData.password && !isPasswordValid && (
                   <p className="text-[10px] text-red-600 font-bold bg-red-50 p-2 rounded border border-red-200">
-                      Must be 6+ chars, containing at least 1 Uppercase, 1 Lowercase, 1 Number and 1 Special Character.
+                      Must be 8+ chars, containing at least 1 Uppercase, 1 Lowercase, 1 Number and 1 Special Character.
                   </p>
               )}
-              <button onClick={() => setStep(2)} disabled={!formData.firstName || formData.mobile.length !== 10 || !isEmailValid || !isPasswordValid || formData.password !== formData.confirmPassword} className="w-full mt-4 bg-[#000080] text-white p-3.5 rounded-xl font-black flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wider">Next: KYC Details <ArrowRight size={18}/></button>
+              
+              <button onClick={() => setStep(2)} disabled={!formData.firstName || formData.mobile.length !== 10 || !isEmailValid || !isPasswordValid || formData.password !== formData.confirmPassword || !isAgeValid} className="w-full mt-4 bg-[#000080] text-white p-3.5 rounded-xl font-black flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-wider">Next: KYC Details <ArrowRight size={18}/></button>
             </div>
           )}
           {step === 2 && (
@@ -876,13 +1014,14 @@ const RegisterPage = () => {
 };
 
 // =========================================================================
-// 7. USER DASHBOARD (REDESIGNED)
+// 7. USER DASHBOARD
 // =========================================================================
 const UserDashboard = () => {
   const navigate = useNavigate();
   const videoRef = useRef(null);
+  const kycVideoRef = useRef(null); // NAYA: For Re-KYC camera
   
-  const { currentUser, candidates, castVote, logout, updateProfile, electionStatus, submitTicket, config, loggedInUserId, tickets, dismissTicket } = useVoting();
+  const { currentUser, users, candidates, castVote, logout, updateProfile, submitTicket, config, loggedInUserId, tickets, dismissTicket, showToast, requestKycUpdate } = useVoting();
   
   const [activeTab, setActiveTab] = useState('vote');
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -891,11 +1030,19 @@ const UserDashboard = () => {
   const [modelsLoaded, setModelsLoaded] = useState(false);
 
   const [mobile, setMobile] = useState(currentUser?.mobile || '');
-  const [profileImage, setProfileImage] = useState(currentUser?.photo || null);
   const [passEmailSent, setPassEmailSent] = useState(false);
   
   const [supportMessage, setSupportMessage] = useState('');
   const [ticketSubmitted, setTicketSubmitted] = useState(false);
+
+  // NAYA: Re-KYC States
+  const [kycModalOpen, setKycModalOpen] = useState(false);
+  const [kycStep, setKycStep] = useState(1);
+  const [kycData, setKycData] = useState({ aadharPhoto: null, facePhoto: null, faceDescriptor: null });
+  const [isKycScanning, setIsKycScanning] = useState(false);
+  const [kycScanStatus, setKycScanStatus] = useState("AI Ready");
+  const [kycProgress, setKycProgress] = useState(0);
+  const [isKycSubmitting, setIsKycSubmitting] = useState(false);
 
   const myTickets = (tickets || []).filter(t => t.userId === currentUser?.id);
 
@@ -908,8 +1055,8 @@ const UserDashboard = () => {
   if (currentUser.role === 'admin') return <Navigate to="/admin" replace />;
 
   const initiateVote = (id) => {
-    if (config?.electionStatus !== 'active') return alert("Voting is not active right now!");
-    if (!modelsLoaded) return alert("Please wait, AI Models are loading...");
+    if (config?.electionStatus !== 'active') return showToast("Voting is not active right now!", "error");
+    if (!modelsLoaded) return showToast("Please wait, AI Models are loading...", "info");
     setSelectedCandidate(id); setShowVerifyModal(true); setStatus('idle');
   };
 
@@ -938,22 +1085,12 @@ const UserDashboard = () => {
     }
   };
 
-  const handleProfileImageChange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => { 
-              setProfileImage(reader.result);
-              updateProfile(currentUser.id, { photo: reader.result });
-          };
-          reader.readAsDataURL(file);
-      }
-  };
-
   const handleSendPasswordResetLink = async (e) => {
       e.preventDefault();
+      showToast("Requesting secure link...", "info");
       await sendCustomEmail(currentUser.email, "Security Alert - ECI Portal", "A password reset link has been requested for your account. If this wasn't you, please contact support immediately.");
       setPassEmailSent(true);
+      showToast("Link sent to registered email.", "success");
       setTimeout(() => setPassEmailSent(false), 5000);
   };
 
@@ -977,7 +1114,63 @@ const UserDashboard = () => {
       })).sort((a,b) => b.votes - a.votes);
   };
 
-  // Modernized VVPAT / EPIC Card
+  // NAYA: Re-KYC functions
+  const handleKycFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) { 
+      const reader = new FileReader();
+      reader.onloadend = () => { setKycData({ ...kycData, aadharPhoto: reader.result }); };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const startKycScanning = async () => {
+    if (!modelsLoaded) return alert("Please wait for AI models to load.");
+    setIsKycScanning(true); setKycProgress(0); setKycScanStatus("Keep face steady...");
+    let scans = 0; const requiredScans = 10; let totalDescriptor = new Float32Array(128).fill(0);
+    
+    const interval = setInterval(async () => {
+      if (scans >= requiredScans) {
+        clearInterval(interval);
+        const finalDescriptor = Array.from(totalDescriptor).map(val => val / requiredScans);
+        setKycData(prev => ({ ...prev, faceDescriptor: finalDescriptor, facePhoto: captureFrame(kycVideoRef) }));
+        setIsKycScanning(false); setKycScanStatus("Biometric Captured!");
+        return;
+      }
+      try {
+        const descriptor = await getFaceDescriptor(kycVideoRef);
+        if (descriptor) {
+          for (let i = 0; i < 128; i++) totalDescriptor[i] += descriptor[i];
+          scans++; setKycProgress(Math.round((scans / requiredScans) * 100)); setKycScanStatus(`Scanning... ${Math.round((scans / requiredScans) * 100)}%`);
+        } else { setKycScanStatus("Face not detected. Adjust lighting."); }
+      } catch (err) { clearInterval(interval); setIsKycScanning(false); setKycScanStatus("Camera Error!"); }
+    }, 300);
+  };
+
+  const submitKycUpdate = async () => {
+    if(isKycSubmitting) return;
+    setIsKycSubmitting(true);
+
+    if (users && kycData.faceDescriptor) {
+        const isDuplicateFace = users.some(user => {
+            if (user.id === currentUser.id) return false; // ignore self
+            if (!user.faceDescriptor) return false;
+            return calculateDistance(user.faceDescriptor, kycData.faceDescriptor) < 0.45; 
+        });
+        if (isDuplicateFace) {
+            showToast("Face already registered with another ID!", "error");
+            setIsKycSubmitting(false);
+            return; 
+        }
+    }
+    
+    await requestKycUpdate(currentUser.id, kycData);
+    setKycModalOpen(false);
+    setIsKycSubmitting(false);
+    setKycStep(1);
+    setKycData({ aadharPhoto: null, facePhoto: null, faceDescriptor: null });
+  };
+
   const VoterIDCard = () => (
     <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 mt-8 relative transform transition-transform hover:scale-[1.02]">
       <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9933] via-white to-[#138808] z-20"></div>
@@ -988,13 +1181,14 @@ const UserDashboard = () => {
       <div className="p-6 flex flex-col items-center bg-slate-50 relative">
         <div className="absolute top-4 right-4 text-[#000080] opacity-5"><ShieldCheck size={100}/></div>
         <div className="w-32 h-32 rounded-xl border-4 border-white shadow-lg overflow-hidden mb-4 z-10 bg-slate-200">
-           {profileImage ? <img src={profileImage} className="w-full h-full object-cover" alt="Voter" /> : currentUser.facePhoto ? <img src={currentUser.facePhoto} className="w-full h-full object-cover" alt="Voter" /> : <div className="w-full h-full flex items-center justify-center text-slate-400">Photo</div>}
+           {currentUser.facePhoto ? <img src={currentUser.facePhoto} className="w-full h-full object-cover" alt="Voter" /> : <div className="w-full h-full flex items-center justify-center text-slate-400">Photo</div>}
         </div>
         <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight z-10">{currentUser.firstName} {currentUser.lastName}</h1>
         <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-1.5 rounded-lg font-mono text-sm font-bold mt-3 shadow-sm tracking-widest z-10">ECI{currentUser.id.slice(-6).toUpperCase()}</div>
         <div className="w-full grid grid-cols-2 gap-4 text-xs text-left bg-white p-4 rounded-xl mt-6 shadow-sm border border-slate-200 z-10">
           <p className="text-slate-500 font-bold uppercase">Mobile:<br/><b className="text-slate-800 font-mono text-sm">{mobile}</b></p>
           <p className="text-slate-500 font-bold uppercase">Aadhar:<br/><b className="text-slate-800 font-mono text-sm">XXXX XXXX {currentUser.aadharNo?.slice(-4)}</b></p>
+          <p className="text-slate-500 font-bold uppercase col-span-2 text-center border-t pt-2 mt-2">D.O.B: <b className="text-slate-800 font-mono text-sm">{currentUser.dob || 'N/A'}</b></p>
         </div>
       </div>
       <div className="bg-gradient-to-r from-[#FF9933] to-orange-500 text-center text-white py-2 text-[10px] font-black tracking-[0.3em]">VALID FOR E-VOTING ONLY</div>
@@ -1004,6 +1198,56 @@ const UserDashboard = () => {
   return (
     <div className="min-h-screen bg-slate-100 font-sans pb-20 md:pb-0">
       
+      {/* NAYA: RE-KYC MODAL */}
+      {kycModalOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-8 flex flex-col items-center border-t-8 border-[#000080] shadow-2xl animate-fade-in-up relative overflow-hidden">
+             <button onClick={() => setKycModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><X size={24}/></button>
+             <h3 className="text-xl font-black mb-1 text-[#000080] uppercase tracking-wide">Update Re-KYC</h3>
+             
+             {kycStep === 1 && (
+                <div className="w-full mt-4 space-y-4 animate-fade-in text-center">
+                    <p className="text-xs text-slate-500 font-bold mb-4">Step 1: Upload New Aadhar / Proof</p>
+                    <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 relative hover:bg-slate-50 transition-colors bg-white">
+                      <input type="file" accept="image/*" onChange={handleKycFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
+                      {kycData.aadharPhoto ? (
+                        <img src={kycData.aadharPhoto} className="h-32 mx-auto object-contain rounded shadow-md border border-slate-200" alt="Preview"/>
+                      ) : (
+                        <div><Upload size={40} className="mx-auto mb-3 text-[#000080] opacity-80"/><p className="text-sm text-slate-700 font-bold">Upload Aadhar</p></div>
+                      )}
+                    </div>
+                    <button onClick={() => setKycStep(2)} disabled={!kycData.aadharPhoto} className="w-full bg-[#000080] text-white p-3.5 rounded-lg font-bold disabled:bg-slate-300 transition-all uppercase text-sm">Next Step</button>
+                </div>
+             )}
+
+             {kycStep === 2 && (
+                 <div className="w-full mt-4 space-y-4 animate-fade-in text-center">
+                    <p className="text-xs text-slate-500 font-bold mb-4">Step 2: Live Face Verification</p>
+                    <div className="bg-slate-900 rounded-2xl flex flex-col items-center justify-center relative h-56 border-4 border-[#138808] overflow-hidden">
+                        {kycData.facePhoto ? (
+                            <img src={kycData.facePhoto} className="w-full h-full object-cover opacity-80" />
+                        ) : (
+                            <>
+                                <NativeCamera videoRef={kycVideoRef} />
+                                {isKycScanning && <div className="absolute top-0 left-0 h-1.5 bg-[#138808] w-full animate-pulse z-20"></div>}
+                                {!isKycScanning && <button onClick={startKycScanning} className="absolute bottom-4 bg-[#000080] text-white px-4 py-2 rounded-full font-bold shadow-2xl border border-blue-400 text-xs">Capture Face</button>}
+                            </>
+                        )}
+                    </div>
+                    <p className="text-xs font-bold text-[#000080]">{kycScanStatus}</p>
+                    
+                    <div className="flex gap-3 mt-4">
+                        <button onClick={() => setKycStep(1)} className="flex-1 bg-slate-200 text-slate-700 p-3 rounded-lg font-bold hover:bg-slate-300">Back</button>
+                        <button onClick={submitKycUpdate} disabled={!kycData.facePhoto || isKycSubmitting} className="flex-1 bg-[#138808] text-white p-3 rounded-lg font-bold disabled:bg-slate-300 flex justify-center items-center gap-2">
+                           {isKycSubmitting ? <Loader2 size={16} className="animate-spin"/> : <ShieldCheck size={16}/>} Submit
+                        </button>
+                    </div>
+                 </div>
+             )}
+          </div>
+        </div>
+      )}
+
       {showVerifyModal && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-sm p-8 flex flex-col items-center border-t-8 border-[#000080] shadow-2xl animate-fade-in-up">
@@ -1022,7 +1266,7 @@ const UserDashboard = () => {
         </div>
       )}
 
-      {/* REDESIGNED NAVBAR */}
+      {/* NAVBAR */}
       <nav className="bg-[#000080] shadow-md px-4 py-3 flex justify-between items-center sticky top-0 z-40 border-b-4 border-[#FF9933]">
         <div className="flex items-center gap-3">
             <EciLogoSmall />
@@ -1090,6 +1334,14 @@ const UserDashboard = () => {
                             {myTickets.map(ticket => (
                                 <div key={ticket.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-left shadow-sm transition-all hover:border-slate-300">
                                     <p className="text-sm font-medium text-slate-700 mb-3 leading-relaxed">"{ticket.message}"</p>
+                                    
+                                    {ticket.status === 'resolved' && ticket.adminReply && (
+                                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 mb-3">
+                                            <span className="font-bold flex items-center gap-1 mb-1 text-[10px] uppercase tracking-widest"><ShieldCheck size={14}/> Admin Reply</span>
+                                            <p className="font-medium">"{ticket.adminReply}"</p>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between items-center border-t border-slate-200 pt-3">
                                         {ticket.status === 'open' ? (
                                             <span className="bg-orange-100 text-orange-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 border border-orange-200">
@@ -1118,23 +1370,9 @@ const UserDashboard = () => {
           <div className="max-w-xl mx-auto animate-fade-in-up">
              <h2 className="text-3xl font-black text-[#000080] mb-8 uppercase text-center tracking-widest">Account Settings</h2>
              
-             <div className="bg-white p-8 rounded-3xl shadow-sm mb-6 border border-slate-200 border-t-8 border-t-[#FF9933] flex flex-col sm:flex-row items-center gap-6">
-                <div className="relative group cursor-pointer w-24 h-24 rounded-full overflow-hidden border-4 border-slate-100 shadow-inner bg-slate-200 shrink-0">
-                    {profileImage ? <img src={profileImage} className="w-full h-full object-cover" /> : currentUser.facePhoto ? <img src={currentUser.facePhoto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-500 font-bold">Img</div>}
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Upload size={24} className="text-white"/>
-                    </div>
-                    <input type="file" accept="image/*" onChange={handleProfileImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="Update Profile Photo"/>
-                </div>
-                <div className="text-center sm:text-left">
-                    <h3 className="font-black text-lg text-slate-800 uppercase tracking-wide">Profile Photo</h3>
-                    <p className="text-xs text-slate-500 font-bold mt-1">Click the image to upload a new profile photo for your e-EPIC card.</p>
-                </div>
-             </div>
-
-             <div className="bg-white p-8 rounded-3xl shadow-sm mb-6 border border-slate-200">
+             <div className="bg-white p-8 rounded-3xl shadow-sm mb-6 border border-slate-200 border-t-8 border-t-[#FF9933]">
                 <h3 className="font-black text-lg text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide"><Settings size={20} className="text-slate-500"/> Contact Info</h3>
-                <form onSubmit={(e)=>{e.preventDefault(); updateProfile(currentUser.id, { mobile }); alert("Mobile number updated successfully.");}}>
+                <form onSubmit={(e)=>{e.preventDefault(); updateProfile(currentUser.id, { mobile });}}>
                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Registered Mobile</label>
                     <div className="flex flex-col sm:flex-row gap-3">
                         <input value={mobile} onChange={e=>setMobile(e.target.value)} className="flex-1 border border-slate-300 p-3.5 rounded-xl focus:ring-2 focus:ring-[#000080] outline-none font-bold text-slate-700 bg-slate-50" />
@@ -1143,7 +1381,7 @@ const UserDashboard = () => {
                 </form>
              </div>
 
-             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 border-t-8 border-t-[#138808]">
+             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 border-t-8 border-t-[#138808] mb-6">
                 <h3 className="font-black text-lg text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide"><ShieldCheck size={20} className="text-[#138808]"/> Security Password</h3>
                 <p className="text-sm text-slate-600 font-medium mb-6">To ensure the security of your account, password resets are processed via an encrypted link sent to your registered email.</p>
                 
@@ -1163,104 +1401,135 @@ const UserDashboard = () => {
                     </form>
                 )}
              </div>
+
+             {/* NAYA: RE-KYC / UPDATE BIOMETRICS */}
+             {currentUser.status !== 'pending' && (
+                 <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 border-t-8 border-t-blue-500 mb-6">
+                    <h3 className="font-black text-lg text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide"><ScanFace size={20} className="text-blue-500"/> Update Biometrics (Re-KYC)</h3>
+                    <p className="text-sm text-slate-600 font-medium mb-6">Need to update your Aadhar photo or Face Scan? Submitting a Re-KYC request will temporarily suspend your account until the Admin approves your new details.</p>
+                    <button onClick={() => setKycModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black shadow-md transition-colors flex justify-center items-center gap-2 uppercase tracking-widest">
+                        <RefreshCw size={18}/> Start Re-KYC
+                    </button>
+                 </div>
+             )}
           </div>
         )}
 
         {activeTab === 'vote' && (
           <div className="animate-fade-in-up">
-            {config && config.resultsPublished && (
-                <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-8 transform transition-all">
-                    <div className="bg-[#000080] p-6 text-white text-center border-b-4 border-[#FF9933]"><BarChart3 size={40} className="mx-auto mb-3 opacity-90"/><h2 className="text-2xl font-black uppercase tracking-widest">Official Results Declared</h2></div>
-                    <div className="p-6 md:p-8 space-y-6 bg-slate-50">
-                        {calculateResults().map((c, index) => {
-                             const total = Object.values(config.votes || {}).reduce((a,b)=>a+b,0) || 1;
-                             const percentage = ((c.votes/total)*100).toFixed(1);
-                             return (
-                                <div key={c.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
-                                    {index === 0 && c.votes > 0 && <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-black px-4 py-1.5 uppercase tracking-widest rounded-bl-xl shadow-sm">Winner</div>}
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <span className="text-4xl bg-slate-100 w-16 h-16 flex items-center justify-center rounded-full border shadow-sm">{c.symbol}</span>
-                                            <div><p className="font-black uppercase text-slate-800 text-xl">{c.party}</p><p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{c.name}</p></div>
-                                        </div>
-                                        <div className="text-right"><p className="text-4xl font-black text-[#138808]">{c.votes}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Votes</p></div>
-                                    </div>
-                                    <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden border inset-shadow relative">
-                                        <div className="h-full bg-gradient-to-r from-[#FF9933] via-[#ffb366] to-[#138808] transition-all duration-1000 ease-out" style={{width: `${percentage}%`}}></div>
-                                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-700 drop-shadow-sm">{percentage}%</span>
-                                    </div>
-                                </div>
-                             )
-                        })}
-                    </div>
+            
+            {/* NAYA: PENDING & REJECTED KYC BLOCKS FOR VOTING TAB */}
+            {currentUser.status === 'pending' ? (
+                <div className="text-center py-24 bg-white rounded-[2.5rem] shadow-sm border border-yellow-200 max-w-3xl mx-auto">
+                    <Loader2 className="w-20 h-20 text-[#FF9933] mx-auto mb-6 animate-spin"/>
+                    <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tight">KYC Pending</h2>
+                    <p className="text-slate-500 font-bold mt-4 uppercase tracking-widest">Your account is under review by the Admin.<br/>You cannot cast a vote at this moment.</p>
                 </div>
-            )}
-
-            {currentUser.hasVoted ? (
-              <div className="max-w-2xl mx-auto text-center py-12 bg-white rounded-[2.5rem] shadow-xl border border-green-100 overflow-hidden relative">
-                 <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-[#FF9933] via-white to-[#138808]"></div>
-                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
-                 
-                 <div className="w-28 h-28 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 mt-4 shadow-inner border-4 border-green-100 relative z-10">
-                    <CheckCircle className="w-16 h-16 text-[#138808]"/>
-                 </div>
-                 <h2 className="text-4xl font-black text-[#000080] mb-2 uppercase tracking-tight relative z-10">Vote Cast Successfully!</h2>
-                 <p className="text-slate-500 font-bold tracking-wide relative z-10">Your vote has been securely recorded on the blockchain ledger.</p>
-                 
-                 <div className="mt-8 bg-slate-50 border border-slate-200 p-8 rounded-3xl mx-6 md:mx-12 shadow-inner relative z-10">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3 flex justify-center items-center gap-2"><ShieldCheck size={18} className="text-[#000080]"/> Secure VVPAT Receipt</p>
-                    <p className="font-mono text-sm md:text-base text-[#138808] font-bold break-all bg-white p-5 rounded-xl border border-green-200 shadow-sm select-all">{currentUser.voteHash || "0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}</p>
-                 </div>
-              </div>
+            ) : currentUser.status === 'rejected' ? (
+                <div className="text-center py-24 bg-white rounded-[2.5rem] shadow-sm border border-red-200 max-w-3xl mx-auto">
+                    <ShieldAlert className="w-20 h-20 text-red-500 mx-auto mb-6"/>
+                    <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tight">KYC Rejected</h2>
+                    <p className="text-slate-500 font-bold mt-4 uppercase tracking-widest">Your previous verification failed.<br/>Please go to Settings and submit a Re-KYC request.</p>
+                    <button onClick={() => setActiveTab('settings')} className="mt-6 bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-xl font-bold uppercase tracking-widest">Go to Settings</button>
+                </div>
             ) : (
-              (!config || !config.resultsPublished) && (
-                  <>
-                    <div className="mb-10 text-center">
-                        <h2 className="text-3xl font-black text-[#000080] uppercase tracking-widest">General Assembly Election</h2>
-                        <p className="text-slate-500 font-bold mt-2 uppercase text-sm tracking-widest border-b-2 border-[#FF9933] inline-block pb-1">Please select your candidate. Your vote is secret.</p>
-                    </div>
-                    
-                    {config?.electionStatus === 'upcoming' && <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-slate-200"><Clock className="w-24 h-24 text-[#FF9933] mx-auto mb-6 opacity-80 animate-pulse-slow"/><h2 className="text-4xl font-black text-slate-800 uppercase tracking-tight">Election Starts Soon</h2><p className="text-slate-500 font-bold mt-3 uppercase tracking-widest">The voting lines have not been opened yet.</p></div>}
-                    
-                    {config?.electionStatus === 'completed' && <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-slate-200"><Lock className="w-24 h-24 text-[#000080] mx-auto mb-6 opacity-80"/><h2 className="text-4xl font-black text-slate-800 uppercase tracking-tight">Election Concluded</h2><p className="text-slate-500 font-bold mt-3 uppercase tracking-widest">Voting is now closed. Awaiting results.</p></div>}
-                    
-                    {config?.electionStatus === 'active' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {candidates.map(c => (
-                                <div key={c.id} className="bg-white rounded-3xl shadow-md hover:shadow-2xl transition-all overflow-hidden border border-slate-200 group flex flex-col transform hover:-translate-y-2 relative">
-                                    <div className="h-56 relative p-6 flex items-center justify-center border-b border-slate-200 overflow-hidden bg-slate-100">
-                                        {/* NAYA: Background Image Display */}
-                                        {c.backgroundUrl ? (
-                                          <div className="absolute inset-0 z-0">
-                                            <img src={c.backgroundUrl} className="w-full h-full object-cover opacity-20" alt="background"/>
-                                            <div className="absolute inset-0 bg-gradient-to-t from-slate-100 via-transparent to-transparent"></div>
-                                          </div>
-                                        ) : (
-                                          <div className="absolute inset-0 z-0 bg-gradient-to-b from-slate-100 to-slate-200"></div>
-                                        )}
-                                        
-                                        <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white shadow-xl z-10 bg-slate-300 relative">
-                                            {c.photo ? <img src={c.photo} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/> : null}
+                <>
+                    {/* ORIGINAL VOTING LOGIC FOR APPROVED USERS */}
+                    {config && config.resultsPublished && (
+                        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-8 transform transition-all">
+                            <div className="bg-[#000080] p-6 text-white text-center border-b-4 border-[#FF9933]"><BarChart3 size={40} className="mx-auto mb-3 opacity-90"/><h2 className="text-2xl font-black uppercase tracking-widest">Official Results Declared</h2></div>
+                            <div className="p-6 md:p-8 space-y-6 bg-slate-50">
+                                {calculateResults().map((c, index) => {
+                                     const total = Object.values(config.votes || {}).reduce((a,b)=>a+b,0) || 1;
+                                     const percentage = ((c.votes/total)*100).toFixed(1);
+                                     return (
+                                        <div key={c.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
+                                            {index === 0 && c.votes > 0 && <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-black px-4 py-1.5 uppercase tracking-widest rounded-bl-xl shadow-sm">Winner</div>}
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div className="flex items-center gap-4">
+                                                    <span className="text-4xl bg-slate-100 w-16 h-16 flex items-center justify-center rounded-full border shadow-sm">{c.symbol}</span>
+                                                    <div><p className="font-black uppercase text-slate-800 text-xl">{c.party}</p><p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{c.name}</p></div>
+                                                </div>
+                                                <div className="text-right"><p className="text-4xl font-black text-[#138808]">{c.votes}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Votes</p></div>
+                                            </div>
+                                            <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden border inset-shadow relative">
+                                                <div className="h-full bg-gradient-to-r from-[#FF9933] via-[#ffb366] to-[#138808] transition-all duration-1000 ease-out" style={{width: `${percentage}%`}}></div>
+                                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-700 drop-shadow-sm">{percentage}%</span>
+                                            </div>
                                         </div>
-                                        <div className="absolute top-4 right-4 w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center text-4xl border-2 border-[#FF9933] group-hover:scale-125 transition-transform duration-300 z-10">
-                                            {c.symbol}
-                                        </div>
-                                    </div>
-                                    <div className="p-8 flex-1 flex flex-col justify-between bg-white z-10">
-                                        <div className="text-center mb-8">
-                                            <h3 className="font-black text-2xl text-slate-800 uppercase tracking-tight leading-tight">{c.name}</h3>
-                                            <p className="text-[#FF9933] font-black tracking-widest text-sm uppercase mt-2">{c.party}</p>
-                                        </div>
-                                        <button onClick={() => initiateVote(c.id)} className="w-full py-4 bg-slate-50 border-2 border-[#000080] text-[#000080] group-hover:bg-[#000080] group-hover:text-white font-black rounded-xl uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2">
-                                            <Fingerprint size={20}/> CAST VOTE
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                     )
+                                })}
+                            </div>
                         </div>
                     )}
-                  </>
-              )
+
+                    {currentUser.hasVoted ? (
+                      <div className="max-w-2xl mx-auto text-center py-12 bg-white rounded-[2.5rem] shadow-xl border border-green-100 overflow-hidden relative">
+                         <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-[#FF9933] via-white to-[#138808]"></div>
+                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
+                         
+                         <div className="w-28 h-28 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 mt-4 shadow-inner border-4 border-green-100 relative z-10">
+                            <CheckCircle className="w-16 h-16 text-[#138808]"/>
+                         </div>
+                         <h2 className="text-4xl font-black text-[#000080] mb-2 uppercase tracking-tight relative z-10">Vote Cast Successfully!</h2>
+                         <p className="text-slate-500 font-bold tracking-wide relative z-10">Your vote has been securely recorded on the blockchain ledger.</p>
+                         
+                         <div className="mt-8 bg-slate-50 border border-slate-200 p-8 rounded-3xl mx-6 md:mx-12 shadow-inner relative z-10">
+                            <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3 flex justify-center items-center gap-2"><ShieldCheck size={18} className="text-[#000080]"/> Secure VVPAT Receipt</p>
+                            <p className="font-mono text-sm md:text-base text-[#138808] font-bold break-all bg-white p-5 rounded-xl border border-green-200 shadow-sm select-all">{currentUser.voteHash || "0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}</p>
+                         </div>
+                      </div>
+                    ) : (
+                      (!config || !config.resultsPublished) && (
+                          <>
+                            <div className="mb-10 text-center">
+                                <h2 className="text-3xl font-black text-[#000080] uppercase tracking-widest">General Assembly Election</h2>
+                                <p className="text-slate-500 font-bold mt-2 uppercase text-sm tracking-widest border-b-2 border-[#FF9933] inline-block pb-1">Please select your candidate. Your vote is secret.</p>
+                            </div>
+                            
+                            {config?.electionStatus === 'upcoming' && <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-slate-200"><Clock className="w-24 h-24 text-[#FF9933] mx-auto mb-6 opacity-80 animate-pulse-slow"/><h2 className="text-4xl font-black text-slate-800 uppercase tracking-tight">Election Starts Soon</h2><p className="text-slate-500 font-bold mt-3 uppercase tracking-widest">The voting lines have not been opened yet.</p></div>}
+                            
+                            {config?.electionStatus === 'completed' && <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-slate-200"><Lock className="w-24 h-24 text-[#000080] mx-auto mb-6 opacity-80"/><h2 className="text-4xl font-black text-slate-800 uppercase tracking-tight">Election Concluded</h2><p className="text-slate-500 font-bold mt-3 uppercase tracking-widest">Voting is now closed. Awaiting results.</p></div>}
+                            
+                            {config?.electionStatus === 'active' && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {candidates.map(c => (
+                                        <div key={c.id} className="bg-white rounded-3xl shadow-md hover:shadow-2xl transition-all overflow-hidden border border-slate-200 group flex flex-col transform hover:-translate-y-2 relative">
+                                            <div className="h-56 relative p-6 flex items-center justify-center border-b border-slate-200 overflow-hidden bg-slate-100">
+                                                {/* NAYA: Background Image Display */}
+                                                {c.backgroundUrl ? (
+                                                  <div className="absolute inset-0 z-0">
+                                                    <img src={c.backgroundUrl} className="w-full h-full object-cover opacity-20" alt="background"/>
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-100 via-transparent to-transparent"></div>
+                                                  </div>
+                                                ) : (
+                                                  <div className="absolute inset-0 z-0 bg-gradient-to-b from-slate-100 to-slate-200"></div>
+                                                )}
+                                                
+                                                <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white shadow-xl z-10 bg-slate-300 relative">
+                                                    {c.photo ? <img src={c.photo} className="w-full h-full object-cover" onError={(e)=>e.target.style.display='none'}/> : null}
+                                                </div>
+                                                <div className="absolute top-4 right-4 w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center text-4xl border-2 border-[#FF9933] group-hover:scale-125 transition-transform duration-300 z-10">
+                                                    {c.symbol}
+                                                </div>
+                                            </div>
+                                            <div className="p-8 flex-1 flex flex-col justify-between bg-white z-10">
+                                                <div className="text-center mb-8">
+                                                    <h3 className="font-black text-2xl text-slate-800 uppercase tracking-tight leading-tight">{c.name}</h3>
+                                                    <p className="text-[#FF9933] font-black tracking-widest text-sm uppercase mt-2">{c.party}</p>
+                                                </div>
+                                                <button onClick={() => initiateVote(c.id)} className="w-full py-4 bg-slate-50 border-2 border-[#000080] text-[#000080] group-hover:bg-[#000080] group-hover:text-white font-black rounded-xl uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2">
+                                                    <Fingerprint size={20}/> CAST VOTE
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                          </>
+                      )
+                    )}
+                </>
             )}
           </div>
         )}
@@ -1274,15 +1543,21 @@ const UserDashboard = () => {
 // =========================================================================
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { currentUser, loggedInUserId, users, logs, candidates, config, tickets, updateConfig, updateKYCStatus, deleteUser, addCandidate, deleteCandidate, logout, resetElection, clearLogs, resolveTicket } = useVoting();
+  const { currentUser, loggedInUserId, users, logs, candidates, config, tickets, updateConfig, approveUser, rejectUser, deleteUser, addCandidate, updateCandidate, deleteCandidate, logout, resetElection, clearLogs, resolveTicket, showToast } = useVoting();
   
   const [activeTab, setActiveTab] = useState('voters');
   const [voterSubTab, setVoterSubTab] = useState('pending');
+  
   const [newCandidate, setNewCandidate] = useState({ name: '', party: '', symbol: '', photo: '', backgroundUrl: '' });
+  const [editingCandidateId, setEditingCandidateId] = useState(null);
+  
   const [viewImage, setViewImage] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
+  const [voteFilter, setVoteFilter] = useState('all');
+
+  const [ticketReplies, setTicketReplies] = useState({});
 
   const [seenCounts, setSeenCounts] = useState(() => {
       const saved = localStorage.getItem('adminSeenCounts');
@@ -1309,6 +1584,23 @@ const AdminDashboard = () => {
       setActiveTab(tab);
   };
 
+  const handleCandidateSubmit = (e) => {
+      e.preventDefault();
+      if(editingCandidateId) {
+          updateCandidate(editingCandidateId, newCandidate);
+          setEditingCandidateId(null);
+      } else {
+          addCandidate(newCandidate);
+      }
+      setNewCandidate({ name: '', party: '', symbol: '', photo: '', backgroundUrl: '' });
+  };
+
+  const startEditCandidate = (c) => {
+      setNewCandidate({ name: c.name, party: c.party, symbol: c.symbol, photo: c.photo, backgroundUrl: c.backgroundUrl || '' });
+      setEditingCandidateId(c.id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const unseenVoters = Math.max(0, users.length - (seenCounts.voters || 0));
   const unseenCandidates = Math.max(0, candidates.length - (seenCounts.candidates || 0));
   const unseenLogs = Math.max(0, logs.length - (seenCounts.logs || 0));
@@ -1329,7 +1621,6 @@ const AdminDashboard = () => {
   const handleResetElection = async () => {
       if(window.confirm("WARNING: This will CLEAR ALL VOTES and allow all voters to vote again. Proceed?")) {
           await resetElection();
-          alert("Election Reset Successful. All votes cleared.");
       }
   };
 
@@ -1339,10 +1630,11 @@ const AdminDashboard = () => {
   };
 
   const processedUsers = users
-      .filter(u => 
-          (u.firstName + ' ' + u.lastName).toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (u.aadharNo && u.aadharNo.includes(searchQuery))
-      )
+      .filter(u => {
+          const matchesSearch = (u.firstName + ' ' + u.lastName).toLowerCase().includes(searchQuery.toLowerCase()) || (u.aadharNo && u.aadharNo.includes(searchQuery));
+          const matchesVote = voteFilter === 'all' ? true : (voteFilter === 'voted' ? u.hasVoted : !u.hasVoted);
+          return matchesSearch && matchesVote;
+      })
       .sort((a, b) => {
           const nameA = (a.firstName + ' ' + a.lastName).toLowerCase();
           const nameB = (b.firstName + ' ' + b.lastName).toLowerCase();
@@ -1420,12 +1712,19 @@ const AdminDashboard = () => {
                      pendingUsers.map(user => (
                         <div key={user.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xl flex flex-col xl:flex-row gap-8 relative overflow-hidden">
                             <div className="flex-1 space-y-4 z-10">
-                                <div><h3 className="text-2xl font-black text-[#000080] uppercase">{user.firstName} {user.lastName}</h3><p className="font-mono text-lg font-bold text-slate-600 bg-slate-100 inline-block px-3 py-1 rounded-lg mt-1 border border-slate-200">Aadhar: {user.aadharNo}</p></div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-bold text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner"><p>Mobile: <span className="text-slate-800">{user.mobile}</span></p><p>Email: <span className="text-slate-800">{user.email}</span></p></div>
+                                <div>
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <h3 className="text-2xl font-black text-[#000080] uppercase">{user.firstName} {user.lastName}</h3>
+                                        {/* NAYA: Show badge if this is a Re-KYC request */}
+                                        {user.backupKyc && <span className="bg-purple-100 text-purple-700 text-[10px] font-black px-3 py-1 rounded-full border border-purple-200 uppercase tracking-widest shadow-sm"><RefreshCw size={10} className="inline mr-1 mb-0.5"/> RE-KYC UPDATE</span>}
+                                    </div>
+                                    <p className="font-mono text-lg font-bold text-slate-600 bg-slate-100 inline-block px-3 py-1 rounded-lg border border-slate-200">Aadhar: {user.aadharNo}</p>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-bold text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner"><p>Mobile: <span className="text-slate-800">{user.mobile}</span></p><p>Email: <span className="text-slate-800">{user.email}</span></p><p className="col-span-1 sm:col-span-2">D.O.B: <span className="text-slate-800">{user.dob || 'N/A'}</span></p></div>
                                 <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-200">
-                                    <button onClick={() => updateKYCStatus(user.id, 'approved')} className="flex-1 bg-[#138808] hover:bg-green-700 text-white py-3.5 rounded-xl font-black uppercase tracking-widest shadow-md transition-colors">Approve KYC</button>
-                                    <button onClick={() => updateKYCStatus(user.id, 'rejected')} className="flex-1 bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200 py-3.5 rounded-xl font-black uppercase tracking-widest transition-colors">Reject</button>
-                                    <button onClick={() => { if(window.confirm(`Are you sure you want to PERMANENTLY DELETE ${user.firstName}'s account?`)) deleteUser(user.id); }} className="px-6 py-3.5 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 rounded-xl transition-colors shadow-sm" title="Delete User Permanently"><Trash2 size={22} className="mx-auto"/></button>
+                                    <button onClick={() => approveUser(user.id)} className="flex-1 bg-[#138808] hover:bg-green-700 text-white py-3.5 rounded-xl font-black uppercase tracking-widest shadow-md transition-colors">Approve KYC</button>
+                                    <button onClick={() => rejectUser(user.id)} className="flex-1 bg-orange-100 hover:bg-orange-200 text-orange-700 border border-orange-200 py-3.5 rounded-xl font-black uppercase tracking-widest transition-colors">{user.backupKyc ? "Reject & Restore Old" : "Reject"}</button>
+                                    {!user.backupKyc && <button onClick={() => { if(window.confirm(`Are you sure you want to PERMANENTLY DELETE ${user.firstName}'s account?`)) deleteUser(user.id); }} className="px-6 py-3.5 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 rounded-xl transition-colors shadow-sm" title="Delete User Permanently"><Trash2 size={22} className="mx-auto"/></button>}
                                 </div>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-inner z-10">
@@ -1450,31 +1749,45 @@ const AdminDashboard = () => {
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
                      <input 
                          type="text" 
                          placeholder="Search by Name or Aadhar..." 
                          value={searchQuery}
                          onChange={(e) => setSearchQuery(e.target.value)}
-                         className="p-2.5 border border-slate-300 rounded-lg w-full sm:w-1/2 focus:ring-2 focus:ring-[#000080] outline-none text-sm font-bold text-slate-700"
+                         className="p-2.5 border border-slate-300 rounded-lg w-full md:w-1/3 focus:ring-2 focus:ring-[#000080] outline-none text-sm font-bold text-slate-700"
                      />
-                     <button 
-                         onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} 
-                         className="bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-slate-100 transition-colors w-full sm:w-auto"
-                     >
-                         <ListFilter size={16}/> Sort A-Z: {sortOrder === 'asc' ? 'A to Z' : 'Z to A'}
-                     </button>
+                     <div className="flex gap-2 w-full md:w-auto">
+                         <select value={voteFilter} onChange={(e) => setVoteFilter(e.target.value)} className="bg-white border border-slate-300 text-slate-700 px-3 py-2.5 rounded-lg text-sm font-bold outline-none flex-1 md:flex-none">
+                             <option value="all">All Voters</option>
+                             <option value="voted">Only Voted</option>
+                             <option value="not_voted">Pending (Not Voted)</option>
+                         </select>
+                         <button 
+                             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} 
+                             className="bg-white border border-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-slate-100 transition-colors flex-1 md:flex-none"
+                         >
+                             <ListFilter size={16}/> Sort A-Z: {sortOrder === 'asc' ? 'A to Z' : 'Z to A'}
+                         </button>
+                     </div>
                   </div>
                   <table className="w-full text-left border-collapse whitespace-nowrap">
-                    <thead className="bg-slate-100 text-xs uppercase tracking-widest text-slate-500 font-black"><tr className="border-b"><th className="p-5">Voter Details</th><th className="p-5">Aadhar Number</th><th className="p-5 text-center">Voting Status</th><th className="p-5 text-center">KYC Status</th><th className="p-5 text-center">Action</th></tr></thead>
+                    <thead className="bg-slate-100 text-xs uppercase tracking-widest text-slate-500 font-black"><tr className="border-b"><th className="p-5">Voter Details</th><th className="p-5">Aadhar / DOB</th><th className="p-5 text-center">Voting Status</th><th className="p-5 text-center">KYC Status</th><th className="p-5 text-center">Action</th></tr></thead>
                     <tbody>
-                      {processedUsers.length === 0 ? <tr><td colSpan="5" className="p-10 text-center font-bold text-slate-400">No records found matching your search.</td></tr> : 
+                      {processedUsers.length === 0 ? <tr><td colSpan="5" className="p-10 text-center font-bold text-slate-400">No records found matching your filters.</td></tr> : 
                        processedUsers.map(user => (
                         <tr key={user.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                          <td className="p-5"><p className="font-black text-slate-800 uppercase">{user.firstName} {user.lastName}</p><p className="text-xs font-bold text-slate-500">{user.email} | {user.mobile}</p></td>
-                          <td className="p-5 font-mono text-sm font-bold text-slate-600">{user.aadharNo}</td>
+                          <td className="p-5">
+                            <p className="font-black text-slate-800 uppercase">{user.firstName} {user.lastName}</p>
+                            <p className="text-xs font-bold text-slate-500">{user.email} | {user.mobile}</p>
+                          </td>
+                          <td className="p-5"><p className="font-mono text-sm font-bold text-slate-600">{user.aadharNo}</p><p className="text-xs font-bold text-slate-500">DOB: {user.dob || 'N/A'}</p></td>
                           <td className="p-5 text-center">{user.hasVoted ? <span className="text-[#138808] font-black uppercase text-xs tracking-wider flex items-center justify-center gap-1"><CheckCircle size={14}/> Voted</span> : <span className="text-slate-400 font-bold uppercase text-xs tracking-wider">Pending</span>}</td>
-                          <td className="p-5 text-center"><span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${user.status === 'approved' ? 'bg-green-50 text-green-700 border-green-200' : user.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>{user.status}</span></td>
+                          <td className="p-5 text-center">
+                            {user.status === 'pending' && user.backupKyc ? <span className="bg-purple-100 text-purple-700 text-[10px] font-black px-3 py-1.5 rounded-lg border border-purple-200 uppercase tracking-widest">Re-KYC</span> :
+                             <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${user.status === 'approved' ? 'bg-green-50 text-green-700 border-green-200' : user.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>{user.status}</span>
+                            }
+                          </td>
                           <td className="p-5 text-center">
                               <button onClick={() => { if(window.confirm(`Permanently delete ${user.firstName}'s account?`)) deleteUser(user.id); }} className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Delete Voter">
                                   <Trash2 size={18}/>
@@ -1503,11 +1816,11 @@ const AdminDashboard = () => {
               </div>
 
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[600px]">
+                <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead className="bg-slate-100 text-xs uppercase tracking-widest text-slate-500 font-black">
                       <tr className="border-b border-slate-200">
                          <th className="p-4">Voter details</th>
-                         <th className="p-4 w-1/2">Reported Issue</th>
+                         <th className="p-4 w-1/2">Reported Issue & Reply</th>
                          <th className="p-4 text-center">Status</th>
                          <th className="p-4 text-right">Action</th>
                       </tr>
@@ -1518,26 +1831,43 @@ const AdminDashboard = () => {
                         ) : (
                            (tickets || []).map(ticket => (
                               <tr key={ticket.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                 <td className="p-4">
+                                 <td className="p-4 align-top">
                                      <p className="font-black text-slate-800">{ticket.userName}</p>
                                      <p className="text-xs font-bold text-slate-500 flex items-center gap-1 mt-1"><Phone size={12}/> {ticket.userMobile}</p>
+                                     <p className="text-[10px] text-slate-400 font-bold mt-3">{new Date(ticket.createdAt).toLocaleString()}</p>
                                  </td>
                                  <td className="p-4">
-                                     <div className="bg-orange-50 text-orange-900 p-3 rounded-lg border border-orange-100 text-sm font-medium whitespace-normal">
-                                        {ticket.message}
+                                     <div className="bg-orange-50 text-orange-900 p-3 rounded-lg border border-orange-100 text-sm font-medium whitespace-normal mb-3">
+                                        "{ticket.message}"
                                      </div>
-                                     <p className="text-[10px] text-slate-400 font-bold mt-2">{new Date(ticket.createdAt).toLocaleString()}</p>
+                                     
+                                     {ticket.status === 'open' ? (
+                                         <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Type reply to voter here..." 
+                                                value={ticketReplies[ticket.id] || ''}
+                                                onChange={e => setTicketReplies({...ticketReplies, [ticket.id]: e.target.value})}
+                                                className="flex-1 p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#000080] outline-none"
+                                            />
+                                         </div>
+                                     ) : (
+                                        <div className="bg-green-50 p-2 rounded-lg border border-green-100 text-sm text-green-800 font-medium flex gap-2 items-start">
+                                            <ShieldCheck size={16} className="mt-0.5 shrink-0"/>
+                                            <p>Reply Sent: {ticket.adminReply}</p>
+                                        </div>
+                                     )}
                                  </td>
-                                 <td className="p-4 text-center">
+                                 <td className="p-4 text-center align-top">
                                      {ticket.status === 'open' ? 
                                        <span className="bg-orange-100 text-orange-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Open</span> : 
                                        <span className="bg-green-100 text-green-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Resolved</span>
                                      }
                                  </td>
-                                 <td className="p-4 text-right">
+                                 <td className="p-4 text-right align-top">
                                      {ticket.status === 'open' && (
-                                         <button onClick={() => resolveTicket(ticket)} className="bg-white border border-slate-300 text-slate-700 hover:text-green-600 hover:border-green-300 hover:bg-green-50 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1 ml-auto w-full sm:w-auto">
-                                            <CheckSquare size={14}/> Mark Resolved
+                                         <button onClick={() => resolveTicket(ticket, ticketReplies[ticket.id])} className="bg-white border border-slate-300 text-slate-700 hover:text-white hover:border-green-600 hover:bg-green-600 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1 ml-auto w-full sm:w-auto">
+                                            <Send size={14}/> Resolve & Email
                                          </button>
                                      )}
                                  </td>
@@ -1556,8 +1886,7 @@ const AdminDashboard = () => {
                       <h3 className="font-black text-xl mb-6 text-[#000080] uppercase tracking-wide border-b pb-4 flex justify-between items-center">Registered Parties <span className="bg-blue-50 text-blue-700 px-3 py-1 text-sm rounded-lg">{candidates.length} Setup</span></h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {candidates.map(c => (
-                              <div key={c.id} className="border border-slate-200 rounded-2xl p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow bg-white relative overflow-hidden">
-                                {/* NAYA: Admin candidate list me background flag */}
+                              <div key={c.id} className={`border ${editingCandidateId === c.id ? 'border-[#000080] bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white'} rounded-2xl p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow relative overflow-hidden`}>
                                 {c.backgroundUrl && <img src={c.backgroundUrl} className="absolute inset-0 w-full h-full object-cover opacity-10 pointer-events-none" alt="party background" />}
                                 
                                 <div className="flex items-center gap-4 relative z-10">
@@ -1567,16 +1896,22 @@ const AdminDashboard = () => {
                                        <p className="text-sm font-bold text-[#FF9933]">{c.party} <span className="text-slate-400">|</span> Symbol: {c.symbol}</p>
                                    </div>
                                 </div>
-                                <div className="flex gap-2 relative z-10">
-                                    <button onClick={() => {if(window.confirm("Delete Candidate?")) deleteCandidate(c.id);}} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white border border-slate-200 shadow-sm" title="Delete"><Trash2 size={18}/></button>
+                                <div className="flex flex-col gap-2 relative z-10">
+                                    <button onClick={() => startEditCandidate(c)} className="p-2 text-slate-400 hover:text-[#000080] hover:bg-blue-50 rounded-lg transition-colors bg-white border border-slate-200 shadow-sm" title="Edit"><Edit size={16}/></button>
+                                    <button onClick={() => {if(window.confirm("Delete Candidate?")) deleteCandidate(c.id);}} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-white border border-slate-200 shadow-sm" title="Delete"><Trash2 size={16}/></button>
                                 </div>
                               </div>
                           ))}
                       </div>
                   </div>
-                  <div className="w-full xl:w-[450px] bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8 border-t-8 border-t-[#138808] self-start sticky top-28">
-                      <h3 className="font-black text-xl mb-6 text-slate-800 uppercase tracking-wide flex items-center gap-2"><UserPlus size={24} className="text-[#138808]"/> Add Candidate</h3>
-                      <form onSubmit={(e)=>{e.preventDefault(); addCandidate(newCandidate); setNewCandidate({name:'', party:'', symbol:'', photo:'', backgroundUrl: ''}); alert("Candidate Added");}} className="space-y-5">
+                  <div className="w-full xl:w-[450px] bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8 border-t-8 border-t-[#138808] self-start sticky top-28 transition-all">
+                      <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-black text-xl text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                            {editingCandidateId ? <><Edit size={24} className="text-[#138808]"/> Update Candidate</> : <><UserPlus size={24} className="text-[#138808]"/> Add Candidate</>}
+                        </h3>
+                        {editingCandidateId && <button onClick={() => {setEditingCandidateId(null); setNewCandidate({ name: '', party: '', symbol: '', photo: '', backgroundUrl: '' });}} className="text-xs font-bold text-slate-400 hover:text-slate-600 underline">Cancel Edit</button>}
+                      </div>
+                      <form onSubmit={handleCandidateSubmit} className="space-y-5">
                           <div><label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Candidate Full Name</label><input type="text" required value={newCandidate.name} onChange={e=>setNewCandidate({...newCandidate, name:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-3.5 rounded-xl font-bold focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none" placeholder="E.g. Narendra Modi" /></div>
                           <div><label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Political Party</label><input type="text" required value={newCandidate.party} onChange={e=>setNewCandidate({...newCandidate, party:e.target.value})} className="w-full border border-slate-300 bg-slate-50 p-3.5 rounded-xl font-bold focus:bg-white focus:ring-2 focus:ring-[#138808] outline-none" placeholder="E.g. BJP" /></div>
                           <div>
@@ -1595,7 +1930,9 @@ const AdminDashboard = () => {
                             </div>
                           </div>
                           
-                          <button type="submit" className="w-full mt-4 bg-[#138808] text-white py-4 rounded-xl font-black shadow-lg hover:bg-green-700 uppercase tracking-widest flex justify-center gap-2"><Upload size={18}/> Register Party</button>
+                          <button type="submit" className={`w-full mt-4 text-white py-4 rounded-xl font-black shadow-lg uppercase tracking-widest flex justify-center gap-2 transition-colors ${editingCandidateId ? 'bg-[#000080] hover:bg-blue-900' : 'bg-[#138808] hover:bg-green-700'}`}>
+                              {editingCandidateId ? <><RefreshCw size={18}/> Update Info</> : <><Upload size={18}/> Register Party</>}
+                          </button>
                       </form>
                   </div>
               </div>
@@ -1693,7 +2030,6 @@ const AdminDashboard = () => {
 // =========================================================================
 export default function App() {
   useEffect(() => {
-    // Mobile Viewport Fix
     let meta = document.querySelector('meta[name="viewport"]');
     if (!meta) {
       meta = document.createElement('meta');
@@ -1723,6 +2059,7 @@ export default function App() {
         .custom-scrollbar-dark::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
       `}} />
       <VotingProvider>
+        <ToastManager />
         <BrowserRouter>
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
