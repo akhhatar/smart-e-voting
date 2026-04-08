@@ -894,7 +894,7 @@ const RegisterPage = () => {
     if (users && cleanedFormData.faceDescriptor) {
         const isDuplicateFace = users.some(user => {
             if (!user.faceDescriptor) return false;
-            return calculateDistance(user.faceDescriptor, cleanedFormData.faceDescriptor) < 0.35; 
+            return calculateDistance(user.faceDescriptor, cleanedFormData.faceDescriptor) < 0.38; 
         });
         if (isDuplicateFace) {
             setDuplicateError(true);
@@ -1118,7 +1118,7 @@ const UserDashboard = () => {
       }
       
       const distance = calculateDistance(currentUser.faceDescriptor, liveDescriptor);
-      if (distance < 0.35) {
+      if (distance < 0.45) {
         setStatus('success'); 
         setTimeout(() => { 
             castVote(selectedCandidate); 
@@ -1238,7 +1238,7 @@ const UserDashboard = () => {
   };
 
   const VoterIDCard = () => (
-    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 mt-8 relative transform transition-transform hover:scale-[1.02] print-area print:shadow-none print:border-none print:transform-none">
+    <div id="printable-id-card" className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 mt-8 relative transform transition-transform hover:scale-[1.02] print-area print:shadow-none print:border-none print:transform-none">
       <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9933] via-white to-[#138808] z-20"></div>
       
       {/* Explicit Print Header to ensure it renders in print area */}
@@ -1746,7 +1746,7 @@ const AdminDashboard = () => {
   const turnoutPercentage = totalApproved > 0 ? ((totalVoted / totalApproved) * 100).toFixed(1) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row overflow-hidden relative">
+    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row relative">
       
       {viewImage && (
           <div className="fixed inset-0 bg-black/90 z-[500] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={() => setViewImage(null)}>
@@ -1757,7 +1757,7 @@ const AdminDashboard = () => {
       )}
 
       {/* FIXED SIDEBAR */}
-      <aside className="w-full md:w-72 bg-[#000080] text-white flex flex-col shadow-2xl relative z-20 shrink-0 md:h-screen md:sticky top-0 overflow-y-auto custom-scrollbar">
+      <aside className="w-full md:w-72 bg-[#000080] text-white flex flex-col shadow-2xl relative z-20 shrink-0 md:h-screen md:sticky md:top-0 overflow-y-auto custom-scrollbar">
         <div className="bg-white pt-8 pb-6 px-4 border-b-4 border-[#FF9933]"><EciAdminSidebarLogo /></div>
         <nav className="flex-1 p-4 space-y-2 mt-4">
           <button onClick={() => handleTabChange('voters')} className={`w-full flex items-center gap-3 p-3.5 rounded-xl font-black uppercase tracking-wide transition-all ${activeTab === 'voters' ? 'bg-white text-[#000080] shadow-md' : 'hover:bg-blue-900/50 text-blue-100'}`}>
@@ -1782,7 +1782,7 @@ const AdminDashboard = () => {
         <div className="p-4 border-t border-blue-900/50"><button onClick={() => {logout(); navigate('/login');}} className="w-full bg-red-600/90 text-white p-3.5 rounded-xl font-black uppercase tracking-wider hover:bg-red-600 flex justify-center items-center gap-2 transition-colors"><LogOut size={18}/> Disengage Session</button></div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50 relative">
+      <main className="flex-1 bg-slate-50/50 relative w-full">
         <header className="bg-white p-6 shadow-sm border-b border-slate-200 flex justify-between items-center sticky top-0 z-10 backdrop-blur-md bg-white/90">
             <div className="flex items-center gap-4">
                <div><h1 className="text-2xl font-black uppercase tracking-tight text-slate-800">Chief Electoral Officer</h1><p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Master Surveillance Node</p></div>
@@ -1794,7 +1794,7 @@ const AdminDashboard = () => {
                )}
             </div>
             <div className="flex items-center gap-3">
-               {/* NAYA: Email Service API Toggle */}
+               {/* Email Service API Toggle */}
                <div className="hidden sm:flex items-center gap-2 mr-4 bg-slate-50 border border-slate-200 p-2 rounded-xl">
                     <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Email API:</span>
                     <button onClick={() => updateConfig({ emailServiceEnabled: !config?.emailServiceEnabled })} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shadow-inner border border-black/10 ${config?.emailServiceEnabled ? 'bg-[#138808]' : 'bg-slate-300'}`}>
