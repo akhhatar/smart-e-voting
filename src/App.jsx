@@ -267,7 +267,7 @@ const VotingProvider = ({ children }) => {
       }
 
       const SERVICE_ID = 'service_6p41jep'; 
-      const TEMPLATE_ID = 'template_gtv5x88'; 
+      const TEMPLATE_ID = 'template_qbfvvag'; 
       const PUBLIC_KEY = '5BgUEGlUJN3pofcYM'; 
 
       try {
